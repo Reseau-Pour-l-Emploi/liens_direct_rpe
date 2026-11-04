@@ -108,14 +108,16 @@ var LD = (function () {
       });
       var filters = src.map(function (f) {
         var prev = of[f.dim];
+        var isGeo = !!f.tree || TERRITORIAL.test(f.dim);
         if (!prev) rep.filtersAdded.push(e.title + ' : ' + f.label);
-        else if (!sameValues(prev.values || [], f.values || [])) rep.valuesChanged.push(e.title + ' : ' + f.label);
+        else if (!isGeo && !sameValues(prev.values || [], f.values || [])) rep.valuesChanged.push(e.title + ' : ' + f.label);
         if (f.check) rep.toCheck.push(e.title + ' : ' + f.label + ' (' + f.dim + ')');
         return {
           dim: f.dim, label: f.label, alias: prev ? (prev.alias || '') : '',
           enabled: prev ? prev.enabled !== false : !f.check,
-          multi: !!f.multi, check: !!f.check, values: f.values || [],
-          tree: !!f.tree, geo: TERRITORIAL.test(f.dim), hier: f.hier || '', levels: f.levels || []
+          /* les listes territoriales des pages ne sont pas stockées : le filtre Territoire transverse les porte (fichier allégé) */
+          multi: !!f.multi, check: !!f.check, values: isGeo ? [] : (f.values || []),
+          tree: !!f.tree, geo: isGeo, hier: f.hier || '', levels: f.levels || []
         };
       });
       Object.keys(of).forEach(function (d) { if (!ef[d]) rep.filtersRemoved.push(e.title + ' : ' + of[d].label); });
