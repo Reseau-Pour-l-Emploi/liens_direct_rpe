@@ -402,7 +402,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var grp = (p.path[0] || 'Autres pages') + (p.path[1] ? ' > ' + p.path[1] : '');
       if (grp !== lastGrp) { h += '<tr class="grp"><td colspan="7">' + esc(grp) + '</td></tr>'; lastGrp = grp; }
       var fl = (p.filters || []).map(function (f, i) {
-        if (f.tree || f.geo) return '<div class="fitem"><span class="badge badge--off">' + esc(f.label) + ' : territoire</span><span class="n">' + f.values.length + ' val. | gérée par le filtre territorial (onglet 4)</span></div>';
+        if (f.tree || f.geo) return '<div class="fitem"><span class="badge badge--off">' + esc(f.label) + ' : territoire</span><span class="n">' + 'gérée par le filtre Territoire (onglet 4)</span></div>';
         return '<div class="fitem"><input type="checkbox" data-pid="' + esc(p.id) + '" data-fi="' + i + '" data-ff="enabled"' + (f.enabled !== false ? ' checked' : '') + ' title="Proposer ce filtre">' +
           '<input type="text" data-pid="' + esc(p.id) + '" data-fi="' + i + '" data-ff="alias" value="' + esc(f.alias || '') + '" placeholder="' + esc(f.label) + '" title="' + esc(f.dim) + '">' +
           '<span class="n">' + f.values.length + ' val.</span>' + (f.check ? '<span class="badge badge--warn" title="Dimension déduite : ' + esc(f.dim) + '">à vérifier</span>' : '') +
