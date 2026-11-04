@@ -84,7 +84,14 @@ select,input[type=text]{font:inherit;font-size:14px;padding:8px 10px;border:1px 
 select:focus,.btn:focus-visible,.theme-btn:focus-visible,.page-btn:focus-visible{outline:2px solid var(--ft-bleu);outline-offset:1px}
 .geo select{flex:1 1 180px;max-width:260px}
 .fsel{flex:1 1 200px;max-width:280px}
-.fval{flex:1 1 200px;max-width:280px}
+.fblock{border:1px solid var(--ft-border);border-radius:8px;padding:10px;margin-bottom:10px;background:#fff}
+.fblock .frow{margin-bottom:6px}
+.fcount{font-size:12px;color:var(--ft-fg-3);flex:1}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:999px;border:1px solid var(--ft-gray-300);background:#fff;color:var(--ft-fg-2);cursor:pointer}
+.pill:hover{border-color:var(--ft-indigo);color:var(--ft-indigo)}
+.pill.on{background:var(--ft-indigo);border-color:var(--ft-indigo);color:#fff}
+.pill:focus-visible{outline:2px solid var(--ft-bleu);outline-offset:1px}
 .btn{font:inherit;font-weight:500;font-size:13px;border-radius:4px;padding:8px 14px;cursor:pointer;border:1px solid transparent;background:var(--ft-indigo);color:#fff;display:inline-flex;align-items:center;gap:6px;text-decoration:none;line-height:1.4}
 .btn:hover{background:var(--ft-indigo-dark)}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
@@ -111,7 +118,7 @@ select:focus,.btn:focus-visible,.theme-btn:focus-visible,.page-btn:focus-visible
   .site-inner,main,footer.site .inner{max-width:100%;padding-left:16px;padding-right:16px}
   .layout{grid-template-columns:1fr}
   .nav{position:static;max-height:none}
-  .geo select,.fsel,.fval{max-width:100%}
+  .geo select,.fsel{max-width:100%}
 }
 </style>
 </head>
@@ -132,7 +139,7 @@ select:focus,.btn:focus-visible,.theme-btn:focus-visible,.page-btn:focus-visible
     <summary><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>Comment utiliser cette page</summary>
     <ul>
       <li><b>1.</b> Choisissez un <b>thème</b> dans la colonne de gauche (même organisation que le menu du tableau de bord), puis une <b>page</b>.</li>
-      <li><b>2.</b> Choisissez si besoin un <b>territoire</b> (disponible sur toutes les pages), puis ajoutez les <b>filtres</b> proposés par la page avec <b>Ajouter un filtre</b> : une valeur par filtre.</li>
+      <li><b>2.</b> Choisissez si besoin un <b>territoire</b> (disponible sur toutes les pages), puis ajoutez les <b>filtres</b> proposés par la page avec <b>Ajouter un filtre</b> et cochez une ou plusieurs valeurs.</li>
       <li><b>3.</b> Cliquez sur <b>Générer le lien</b>, puis copiez-le ou ouvrez directement la page filtrée dans le tableau de bord.</li>
       <li>Une fois la page ouverte, les filtres restent modifiables dans le tableau de bord. Pour un <b>Tableau personnalisé</b>, seuls les filtres sont transmis, pas la disposition du tableau.</li>
     </ul>
@@ -211,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function sel() {
     var s = {};
-    state.rows.forEach(function (r) { if (r.dim && r.v) s[r.dim] = r.v; });
+    state.rows.forEach(function (r) { if (r.dim && r.vals.length) s[r.dim] = r.vals.slice(); });
     return s;
   }
   function url() {
@@ -265,10 +272,10 @@ document.addEventListener('DOMContentLoaded', function () {
   function selectPage(id) {
     if (state.page === id) return;
     var keep = {};
-    state.rows.forEach(function (r) { if (r.dim && r.v) keep[r.dim] = r.v; });
+    state.rows.forEach(function (r) { if (r.dim && r.vals.length) keep[r.dim] = r.vals.slice(); });
     state.page = id;
     /* les filtres déjà choisis sont conservés si la nouvelle page les propose */
-    state.rows = Object.keys(keep).filter(function (d) { return fByDim(byId[id], d); }).map(function (d) { return { dim: d, v: keep[d] }; });
+    state.rows = Object.keys(keep).filter(function (d) { return fByDim(byId[id], d); }).map(function (d) { return { dim: d, vals: keep[d].filter(function (v) { return fByDim(byId[id], d).values.some(function (x) { return x.v === v; }); }) }; });
     state.generated = false;
     renderFilters(); renderLink();
   }
@@ -295,17 +302,18 @@ document.addEventListener('DOMContentLoaded', function () {
         var opts = '<option value="">Choisir un filtre</option>' + fs.filter(function (x) { return x.dim === r.dim || !used[x.dim]; }).map(function (x) {
           return '<option value="' + esc(x.dim) + '"' + (x.dim === r.dim ? ' selected' : '') + '>' + esc(x.alias || x.label) + '</option>';
         }).join('');
-        var vals = f ? '<option value="">Choisir une valeur</option>' + sortL(f.values).map(function (v) {
-          return '<option value="' + esc(v.v) + '"' + (v.v === r.v ? ' selected' : '') + '>' + esc(v.l) + '</option>';
-        }).join('') : '<option value="">Choisir d\'abord un filtre</option>';
-        return '<div class="frow"><select class="fsel" data-row="' + i + '" aria-label="Filtre">' + opts + '</select>' +
-          '<select class="fval" data-rowv="' + i + '" aria-label="Valeur"' + (f ? '' : ' disabled') + '>' + vals + '</select>' +
-          '<button class="btn btn--icon btn--ghost" type="button" data-del="' + i + '" title="Retirer ce filtre">' + ICO.x + '</button></div>';
+        var pills = f ? '<div class="pills" role="group" aria-label="Valeurs ' + esc(f.alias || f.label) + '">' + sortL(f.values).map(function (v) {
+          var on = r.vals.indexOf(v.v) >= 0;
+          return '<button type="button" class="pill' + (on ? ' on' : '') + '" aria-pressed="' + on + '" data-pill="' + i + '" data-val="' + esc(v.v) + '">' + (on ? ICO.check : '') + esc(v.l) + '</button>';
+        }).join('') + '</div>' : '';
+        return '<div class="fblock"><div class="frow"><select class="fsel" data-row="' + i + '" aria-label="Filtre">' + opts + '</select>' +
+          (f ? '<span class="fcount">' + (r.vals.length ? r.vals.length + ' valeur' + (r.vals.length > 1 ? 's' : '') + ' choisie' + (r.vals.length > 1 ? 's' : '') : 'Cochez une ou plusieurs valeurs') + '</span>' : '') +
+          '<button class="btn btn--icon btn--ghost" type="button" data-del="' + i + '" title="Retirer ce filtre">' + ICO.x + '</button></div>' + pills + '</div>';
       }).join('');
       var free = fs.length - state.rows.filter(function (r) { return r.dim; }).length;
       var pendingEmpty = state.rows.some(function (r) { return !r.dim; });
       h += '<button class="btn btn--ghost" type="button" id="addRow"' + (free <= 0 || pendingEmpty ? ' disabled' : '') + '>' + ICO.plus + 'Ajouter un filtre</button>' +
-        '<p class="note">' + fs.length + ' filtre' + (fs.length > 1 ? 's' : '') + ' disponible' + (fs.length > 1 ? 's' : '') + ' sur cette page. Une valeur par filtre.</p>';
+        '<p class="note">' + fs.length + ' filtre' + (fs.length > 1 ? 's' : '') + ' disponible' + (fs.length > 1 ? 's' : '') + ' sur cette page. Plusieurs valeurs possibles par filtre.</p>';
     }
     box.innerHTML = h;
   }
@@ -336,21 +344,24 @@ document.addEventListener('DOMContentLoaded', function () {
       if (t.value) state.gpath.push(t.value);
     } else if (t.hasAttribute('data-row')) {
       var r = state.rows[+t.getAttribute('data-row')];
-      r.dim = t.value; r.v = '';
-    } else if (t.hasAttribute('data-rowv')) {
-      state.rows[+t.getAttribute('data-rowv')].v = t.value;
+      r.dim = t.value; r.vals = [];
     } else return;
     renderFilters(); changed();
   });
   fbox.addEventListener('click', function (e) {
     var t = e.target.closest('button');
     if (!t) return;
-    if (t.id === 'addRow') state.rows.push({ dim: '', v: '' });
+    if (t.id === 'addRow') state.rows.push({ dim: '', vals: [] });
+    else if (t.hasAttribute('data-pill')) {
+      var rr = state.rows[+t.getAttribute('data-pill')], val = t.getAttribute('data-val'), k = rr.vals.indexOf(val);
+      if (k >= 0) rr.vals.splice(k, 1); else rr.vals.push(val);
+    }
     else if (t.id === 'geoReset') state.gpath = [];
     else if (t.hasAttribute('data-del')) state.rows.splice(+t.getAttribute('data-del'), 1);
     else return;
     renderFilters(); changed();
     if (t.id === 'addRow') { var s = fbox.querySelectorAll('.fsel'); if (s.length) s[s.length - 1].focus(); }
+    if (t.hasAttribute('data-pill')) { var same = fbox.querySelector('[data-pill="' + t.getAttribute('data-pill') + '"][data-val="' + CSS.escape(t.getAttribute('data-val')) + '"]'); if (same) same.focus(); }
   });
 
   /* ---- 3. Lien ---- */
@@ -362,10 +373,10 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<span class="chip chip--geo">' + ICO.pin + state.gpath.map(function (v, i) { return esc(geoLabel(i + 1, v)); }).join(' > ') + '</span>';
     }
     state.rows.forEach(function (r) {
-      if (!r.dim || !r.v) return;
-      var f = fByDim(p, r.dim), l = r.v;
-      f.values.forEach(function (v) { if (v.v === r.v) l = v.l; });
-      h += '<span class="chip">' + esc(f.alias || f.label) + ' : <b>' + esc(l) + '</b></span>';
+      if (!r.dim || !r.vals.length) return;
+      var f = fByDim(p, r.dim);
+      var l = r.vals.map(function (x) { var t = x; f.values.forEach(function (v) { if (v.v === x) t = v.l; }); return t; });
+      h += '<span class="chip">' + esc(f.alias || f.label) + ' : <b>' + esc(l.join(', ')) + '</b></span>';
     });
     return h;
   }
@@ -373,7 +384,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var p = cur(), box = document.getElementById('linkBox');
     document.getElementById('s4').classList.toggle('step--off', !p);
     if (!p) { box.innerHTML = '<p class="muted">Le lien sera disponible une fois la page choisie.</p>'; return; }
-    var incomplete = state.rows.some(function (r) { return r.dim && !r.v; });
+    var incomplete = state.rows.some(function (r) { return r.dim && !r.vals.length; });
     var h = '<button class="btn btn--lg" type="button" id="gen">' + ICO.link + 'Générer le lien</button>';
     if (incomplete) h += '<p class="note">Un filtre ajouté n\'a pas de valeur : il sera ignoré.</p>';
     if (state.generated) {
