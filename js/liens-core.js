@@ -21,9 +21,11 @@ var LD = (function () {
       '&domain=' + enc(p.domain || '') + '&user=' + enc(p.user || '') + '&pass=' + enc(p.pass || '');
     var used = {};
     (page.filters || []).forEach(function (f) {
-      if (!f.enabled || !sel || !sel[f.dim]) return;
+      var v = sel ? sel[f.dim] : null;
+      if (Array.isArray(v)) v = v.filter(Boolean).join(','); /* plusieurs valeurs : séparées par une virgule (syntaxe DigDash validée) */
+      if (!f.enabled || !v) return;
       used[f.dim] = 1;
-      url += '&' + enc(f.dim) + '=' + enc(sel[f.dim]);
+      url += '&' + enc(f.dim) + '=' + enc(v);
     });
     if (gsel && gsel.g && gsel.v && page.applyGlobals !== false && !used[gsel.g.dim]) {
       url += '&' + enc(gsel.g.dim) + '=' + enc(gsel.v);
