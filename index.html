@@ -119,6 +119,41 @@ select:focus,.btn:focus-visible,.theme-btn:focus-visible,.page-btn:focus-visible
 .own-steps .btn{margin-top:6px}
 .view-item{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .empty{padding:32px 16px;text-align:center;color:var(--ft-fg-3)}
+.hero{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--ft-white);border:1px solid var(--ft-border);border-left:6px solid var(--ft-jaune);border-radius:8px;box-shadow:var(--sh-sm);padding:16px 20px;margin-bottom:16px}
+.hero-txt{flex:1 1 320px}
+.hero-txt b{display:block;font-size:15px;margin-bottom:2px}
+.hero-txt span{font-size:13px;color:var(--ft-fg-2)}
+.wz-bg{position:fixed;inset:0;background:rgba(13,20,64,.55);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px}
+.wz{background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.3);width:min(720px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column}
+.wz-h{padding:16px 20px;border-bottom:1px solid var(--ft-border);display:flex;align-items:center;gap:12px}
+.wz-h h2{margin:0;font-size:17px;flex:1}
+.wz-x{background:none;border:0;font-size:22px;line-height:1;cursor:pointer;color:var(--ft-fg-3);padding:4px 8px}
+.wz-prog{display:flex;gap:6px;padding:12px 20px 0}
+.wz-prog span{flex:1;height:6px;border-radius:3px;background:var(--ft-gray-200)}
+.wz-prog span.on{background:var(--ft-indigo)}
+.wz-prog span.done{background:var(--ft-bleu)}
+.wz-b{padding:16px 20px;overflow:auto}
+.wz-b h3{margin:0 0 4px;font-size:16px}
+.wz-b .sub{margin:0 0 14px;color:var(--ft-fg-2);font-size:13px}
+.wz-f{padding:12px 20px;border-top:1px solid var(--ft-border);display:flex;justify-content:space-between;gap:8px;align-items:center}
+.wz-f .cnt{font-size:12px;color:var(--ft-fg-3)}
+.tp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.tp{border:2px solid var(--ft-border);border-radius:8px;padding:12px;cursor:pointer;background:#fff;text-align:left;font:inherit;color:var(--ft-fg-1)}
+.tp:hover{border-color:var(--ft-indigo)}
+.tp.sel{border-color:var(--ft-indigo);background:var(--ft-indigo-light)}
+.tp b{display:block;font-size:14px}
+.tp span{font-size:12px;color:var(--ft-fg-3)}
+.do{list-style:none;margin:0;padding:0;counter-reset:d}
+.do li{counter-increment:d;position:relative;padding:8px 0 8px 36px;font-size:14px;border-bottom:1px dashed var(--ft-border)}
+.do li:last-child{border-bottom:0}
+.do li::before{content:counter(d);position:absolute;left:0;top:8px;width:24px;height:24px;border-radius:50%;background:var(--ft-indigo-light);color:var(--ft-indigo);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+.tip{background:var(--ft-jaune-light);border-radius:6px;padding:10px 12px;font-size:13px;margin-top:12px}
+.drag-demo{display:flex;align-items:center;justify-content:center;margin:14px 0}
+.bm-btn{display:inline-flex;align-items:center;gap:6px;background:var(--ft-jaune);color:var(--ft-navy);font-weight:700;text-decoration:none;padding:10px 16px;border-radius:6px;box-shadow:0 0 0 0 rgba(255,204,82,.7);animation:pulse 1.8s infinite;cursor:grab}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,204,82,.7)}70%{box-shadow:0 0 0 12px rgba(255,204,82,0)}100%{box-shadow:0 0 0 0 rgba(255,204,82,0)}}
+@media (prefers-reduced-motion:reduce){.bm-btn{animation:none}}
+.check{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;font-weight:500}
+.check input{width:18px;height:18px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ft-navy);color:#fff;padding:10px 18px;border-radius:8px;box-shadow:var(--sh-md);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:2000;display:flex;align-items:center;gap:8px}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media (max-width:900px){
@@ -148,9 +183,14 @@ select:focus,.btn:focus-visible,.theme-btn:focus-visible,.page-btn:focus-visible
       <li><b>1.</b> Choisissez un <b>thème</b> dans la colonne de gauche (même organisation que le menu du tableau de bord), puis une <b>page</b>.</li>
       <li><b>2.</b> Choisissez si besoin un <b>territoire</b> (disponible sur toutes les pages), puis ajoutez les <b>filtres</b> proposés par la page avec <b>Ajouter un filtre</b> et cochez une ou plusieurs valeurs.</li>
       <li><b>3.</b> Cliquez sur <b>Générer le lien</b>, puis copiez-le ou ouvrez directement la page filtrée dans le tableau de bord.</li>
-      <li>Une fois la page ouverte, les filtres restent modifiables dans le tableau de bord. Pour un <b>Tableau personnalisé</b>, le lien transmet les filtres mais pas la disposition du tableau : quand des <b>présentations prêtes à l'emploi</b> sont proposées, ajoutez-les à vos favoris pour mettre le tableau en forme en un clic.</li>
+      <li>Une fois la page ouverte, les filtres restent modifiables dans le tableau de bord. Pour un <b>Tableau personnalisé</b>, le lien transmet les filtres mais pas la disposition du tableau : utilisez <b>Créer ma présentation pas à pas</b> pour enregistrer votre mise en forme dans vos favoris.</li>
     </ul>
   </details>
+
+  <div class="hero">
+    <div class="hero-txt"><b>Retrouvez un tableau personnalisé tout prêt en un clic</b><span>Mettez en forme un tableau personnalisé une fois, enregistrez-le dans vos favoris, puis rouvrez-le quand vous voulez, avec ses filtres et la période de votre choix.</span></div>
+    <button class="btn btn--lg" type="button" id="wzOpen">Créer ma présentation pas à pas</button>
+  </div>
 
   <div class="layout">
     <nav class="card nav" aria-label="Thèmes et pages">
@@ -416,12 +456,8 @@ document.addEventListener('DOMContentLoaded', function () {
           }).join('');
       }
       if (isTP) {
-        h += '<details class="own"' + (vs.length ? '' : ' open') + '><summary class="flabel">Créer vos propres présentations</summary><ol class="own-steps">' +
-          '<li>Une seule fois : faites glisser ce bouton dans votre barre de favoris (Ctrl+Maj+B pour l\'afficher). <a class="btn btn--ghost" draggable="true" href="' + esc(LD_VIEWS.captureBookmarklet()) + '" title="Faites glisser ce bouton dans la barre de favoris">' + ICO.grid + 'Capturer une présentation</a></li>' +
-          '<li>Ouvrez la page avec le lien et mettez le tableau en forme : faites glisser dimensions et mesures sur l\'en-tête du tableau.</li>' +
-          '<li>Cliquez sur le favori <b>Capturer une présentation</b>, nommez votre présentation, puis faites glisser le bouton proposé dans vos favoris.</li>' +
-          '<li>Ensuite, un clic sur ce favori remet le tableau dans cette présentation.</li>' +
-          '</ol></details>';
+        h += '<div class="flabel" style="margin-top:12px">Votre propre présentation</div><p class="note" style="margin:0 0 8px">Mettez ce tableau en forme à votre façon et enregistrez-le dans vos favoris.</p>' +
+          '<button class="btn btn--secondary" type="button" id="wzFromPage">' + ICO.grid + 'Créer ma présentation pas à pas</button>';
       }
 
       h += '</div>';
@@ -429,6 +465,7 @@ document.addEventListener('DOMContentLoaded', function () {
     box.innerHTML = h;
   }
   document.getElementById('linkBox').addEventListener('click', function (e) {
+    if (e.target.closest('#wzFromPage')) { openWizard(cur() ? cur().id : ''); return; }
     var bm = e.target.closest('a[draggable]');
     if (bm) { e.preventDefault(); toast('Faites glisser ce bouton dans votre barre de favoris'); return; }
     var t = e.target.closest('button');
@@ -459,6 +496,121 @@ document.addEventListener('DOMContentLoaded', function () {
     if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function () { toast('Lien copié'); }, fallback);
     else fallback();
   }
+
+  /* ---- Assistant "Créer ma présentation pas à pas" ---- */
+  var tpPages = pages.filter(function (p) { return /tableau personnalis/i.test(p.title + ' ' + (p.label || '')); });
+  function tpName(p) { return p.path[1] || LD.displayTitle(p); }
+  var wz = { step: 0, tp: '', last: null };
+  function lsGetW(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSetW(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
+  var WZ_STEPS = ['Choisir le tableau', 'Installer l\'outil', 'Mettre en forme', 'Capturer', 'C\'est prêt'];
+  var DEMO = '<svg viewBox="0 0 340 130" width="340" height="130" role="img" aria-label="Glisser le bouton jaune vers la barre de favoris">' +
+    '<rect x="1" y="1" width="338" height="128" rx="8" fill="#fff" stroke="#D1D5DB"/><rect x="1" y="1" width="338" height="24" rx="8" fill="#E5E7EB"/>' +
+    '<circle cx="14" cy="13" r="4" fill="#D92424"/><circle cx="26" cy="13" r="4" fill="#FFCC52"/><circle cx="38" cy="13" r="4" fill="#1B7F3B"/>' +
+    '<rect x="1" y="25" width="338" height="22" fill="#F5F2EE"/><text x="10" y="40" font-size="10" fill="#6B7280" font-family="Arial">Barre de favoris</text>' +
+    '<rect x="110" y="29" width="120" height="15" rx="4" fill="none" stroke="#293378" stroke-dasharray="4 3"/>' +
+    '<rect x="160" y="92" width="150" height="24" rx="5" fill="#FFCC52"/><text x="235" y="108" font-size="11" font-weight="bold" fill="#0D1440" text-anchor="middle" font-family="Arial">Capturer une présentation</text>' +
+    '<path d="M200 88 C 190 70, 180 60, 172 50" fill="none" stroke="#293378" stroke-width="2.5" marker-end="url(#ar)"/>' +
+    '<defs><marker id="ar" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#293378"/></marker></defs></svg>';
+  function wzBody() {
+    var p = byId[wz.tp], h = '';
+    if (wz.step === 0) {
+      h = '<h3>Quel tableau personnalisé voulez-vous mettre en forme ?</h3><p class="sub">Cliquez sur un thème.</p><div class="tp-grid">' +
+        tpPages.map(function (t) { return '<button type="button" class="tp' + (t.id === wz.tp ? ' sel' : '') + '" data-tp="' + esc(t.id) + '"><b>' + esc(tpName(t)) + '</b><span>Tableau personnalisé</span></button>'; }).join('') + '</div>';
+    } else if (wz.step === 1) {
+      var inst = lsGetW('ld-capture-installed') === '1';
+      h = '<h3>Installez l\'outil de capture</h3><p class="sub">À faire <b>une seule fois</b> : ensuite, l\'outil restera dans votre navigateur.</p>' +
+        '<ol class="do"><li>Affichez la <b>barre de favoris</b> de votre navigateur : appuyez en même temps sur <b>Ctrl + Maj + B</b>. Une barre apparaît sous la barre d\'adresse.</li>' +
+        '<li>Cliquez sur le bouton jaune ci-dessous, <b>gardez le clic enfoncé</b>, faites-le glisser jusque dans cette barre, puis relâchez.</li></ol>' +
+        '<div class="drag-demo">' + DEMO + '</div>' +
+        '<div style="text-align:center"><a class="bm-btn" draggable="true" href="' + esc(LD_VIEWS.captureBookmarklet(tpPages.map(function (t) { return { name: tpName(t), uid: t.uid }; }))) + '" title="Faites-moi glisser vers la barre de favoris">' + ICO.grid + 'Capturer une présentation</a></div>' +
+        '<div class="tip">Le bouton ne réagit pas au clic, c\'est normal : il faut le <b>faire glisser</b>. S\'il refuse de se déposer, votre poste bloque peut-être ce type de favori : contactez l\'équipe qui gère cette page.</div>' +
+        '<label class="check"><input type="checkbox" id="wzInst"' + (inst ? ' checked' : '') + '> Le bouton "Capturer une présentation" est dans ma barre de favoris</label>';
+    } else if (wz.step === 2) {
+      h = '<h3>Ouvrez le tableau et mettez-le en forme</h3><p class="sub">Tableau choisi : <b>' + esc(p ? tpName(p) : '') + '</b>. Il s\'ouvre dans un nouvel onglet : <b>gardez cette page ouverte</b> pour la suite.</p>' +
+        '<p><a class="btn btn--lg" target="_blank" rel="noopener" id="wzGo" href="' + esc(p ? LD.buildUrl(DATA, p, {}, null) : '#') + '">' + ICO.open + 'Ouvrir le tableau personnalisé</a></p>' +
+        '<ol class="do"><li><b>Lignes et colonnes</b> : à gauche du tableau, dans la liste <b>Dimensions</b>, faites glisser une dimension (par exemple Sexe ou Niveau de formation) sur l\'en-tête du tableau.</li>' +
+        '<li><b>Chiffres affichés</b> : plus bas dans la même liste, sous <b>Mesures</b>, faites glisser la mesure voulue dans le tableau.</li>' +
+        '<li><b>Filtres</b> : cliquez sur l\'icône en forme d\'<b>entonnoir</b> en haut de la liste, puis <b>Ajouter un filtre</b> : territoire, sexe, date... Validez par <b>OK</b>.</li>' +
+        '<li>Vérifiez que le tableau affiche ce que vous voulez retrouver.</li></ol>' +
+        '<div class="tip">Vous vous êtes trompé ? Appuyez sur <b>F5</b> pour revenir au tableau d\'origine et recommencez.</div>';
+    } else if (wz.step === 3) {
+      h = '<h3>Capturez votre tableau</h3><p class="sub">Toujours dans l\'onglet du tableau de bord :</p>' +
+        '<ol class="do"><li>Cliquez sur le favori <b>Capturer une présentation</b> dans votre barre de favoris.</li>' +
+        '<li>Une fenêtre s\'ouvre <b>en bas à droite</b> du tableau de bord. Si votre tableau contient une date, choisissez la <b>période</b> : dernier mois disponible, 12 derniers mois, un mois au choix...</li>' +
+        '<li>Vérifiez le <b>nom</b> proposé, puis cliquez sur <b>Créer le favori</b>.</li>' +
+        '<li>Faites glisser le <b>bouton jaune</b> qui apparaît jusque dans la barre de favoris, comme à l\'étape 2.</li></ol>' +
+        '<div class="tip">Avec une période "dernier mois" ou "12 derniers mois", le favori suit automatiquement les mises à jour des données : inutile de le recréer chaque mois.</div>';
+    } else {
+      h = '<h3>C\'est prêt</h3><p class="sub">Votre présentation est enregistrée dans vos favoris.</p>' +
+        '<ol class="do"><li>Pour retrouver votre tableau : ouvrez le tableau de bord, puis cliquez sur votre favori. La bonne page s\'ouvre et le tableau se met en forme, avec vos filtres.</li>' +
+        '<li>Un message en bas à droite confirme la mise en forme et liste les filtres appliqués.</li>' +
+        '<li>Vous pouvez créer autant de présentations que vous voulez : recommencez à l\'étape 1 (inutile de réinstaller l\'outil).</li></ol>' +
+        '<p><button class="btn btn--secondary" type="button" id="wzAgain">Créer une autre présentation</button></p>';
+    }
+    return h;
+  }
+  function wzCanNext() { return wz.step !== 0 || !!wz.tp; }
+  function wzRender() {
+    var el = document.getElementById('wzDlg');
+    el.querySelector('.wz-prog').innerHTML = WZ_STEPS.map(function (t, i) { return '<span class="' + (i < wz.step ? 'done' : i === wz.step ? 'on' : '') + '" title="' + esc(t) + '"></span>'; }).join('');
+    el.querySelector('.wz-b').innerHTML = wzBody();
+    el.querySelector('.cnt').textContent = 'Étape ' + (wz.step + 1) + ' sur ' + WZ_STEPS.length + ' : ' + WZ_STEPS[wz.step];
+    var prev = el.querySelector('#wzPrev'), next = el.querySelector('#wzNext');
+    prev.hidden = wz.step === 0;
+    next.textContent = wz.step === WZ_STEPS.length - 1 ? 'Terminer' : 'Suivant';
+    next.disabled = !wzCanNext();
+    var h = el.querySelector('.wz-b h3');
+    if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
+  }
+  function openWizard(pid) {
+    wz.last = document.activeElement;
+    wz.tp = pid && /tableau personnalis/i.test((byId[pid] || {}).title || '') ? pid : (wz.tp || '');
+    wz.step = wz.tp ? (lsGetW('ld-capture-installed') === '1' ? 2 : 1) : 0;
+    var bg = document.createElement('div');
+    bg.className = 'wz-bg'; bg.id = 'wzBg';
+    bg.innerHTML = '<div class="wz" id="wzDlg" role="dialog" aria-modal="true" aria-labelledby="wzTitle">' +
+      '<div class="wz-h"><h2 id="wzTitle">Créer ma présentation pas à pas</h2><button class="wz-x" type="button" id="wzClose" aria-label="Fermer">&times;</button></div>' +
+      '<div class="wz-prog"></div><div class="wz-b" aria-live="polite"></div>' +
+      '<div class="wz-f"><span class="cnt"></span><span><button class="btn btn--ghost" type="button" id="wzPrev">Précédent</button> <button class="btn" type="button" id="wzNext">Suivant</button></span></div></div>';
+    document.body.appendChild(bg);
+    document.body.style.overflow = 'hidden';
+    wzRender();
+  }
+  function closeWizard() {
+    var bg = document.getElementById('wzBg');
+    if (bg) bg.remove();
+    document.body.style.overflow = '';
+    if (wz.last && wz.last.focus) wz.last.focus();
+  }
+  document.getElementById('wzOpen').addEventListener('click', function () { openWizard(''); });
+  document.addEventListener('click', function (e) {
+    if (!document.getElementById('wzBg')) return;
+    var t = e.target;
+    if (t.closest('#wzClose')) { closeWizard(); return; }
+    var tp = t.closest('[data-tp]');
+    if (tp) { wz.tp = tp.getAttribute('data-tp'); wzRender(); return; }
+    if (t.closest('#wzPrev')) { wz.step = Math.max(0, wz.step - 1); wzRender(); return; }
+    if (t.closest('#wzNext')) {
+      if (wz.step === WZ_STEPS.length - 1) { closeWizard(); return; }
+      if (wz.step === 1 && !(document.getElementById('wzInst') || {}).checked) { toast('Cochez la case quand le bouton est dans votre barre de favoris'); return; }
+      wz.step++; wzRender(); return;
+    }
+    if (t.closest('#wzAgain')) { wz.tp = ''; wz.step = 0; wzRender(); return; }
+    if (t.closest('.bm-btn')) { e.preventDefault(); toast('Faites glisser ce bouton jusque dans la barre de favoris'); return; }
+  });
+  document.addEventListener('change', function (e) { if (e.target.id === 'wzInst') lsSetW('ld-capture-installed', e.target.checked ? '1' : ''); });
+  document.addEventListener('keydown', function (e) {
+    if (!document.getElementById('wzBg')) return;
+    if (e.key === 'Escape') { closeWizard(); return; }
+    if (e.key === 'Tab') {
+      var f = Array.prototype.filter.call(document.querySelectorAll('#wzDlg button:not([disabled]):not([hidden]), #wzDlg a[href], #wzDlg input'), function (x) { return x.offsetParent !== null; });
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+  if (!tpPages.length) document.querySelector('.hero').hidden = true;
 
   renderTree(); renderFilters(); renderLink();
 });
