@@ -201,7 +201,9 @@ var LD_VIEW_CAPTURE = function (opt) {
     }
     b.querySelector('[data-ld="make"]').onclick = function () {
       var name = b.querySelector('[data-ld="name"]').value.trim() || 'Ma présentation';
-      var V = { name: name, pageId: out.pageId, pageUid: out.pageUid, tfiltres: out.tfiltres, periodes: periodes(), vue: out.vue };
+      var q = new URLSearchParams(location.search), u = location.origin + location.pathname + '?defaultPage=' + encodeURIComponent(out.pageId);
+      ['domain', 'user', 'pass'].forEach(function (k) { if (q.get(k)) u += '&' + k + '=' + encodeURIComponent(q.get(k)); });
+      var V = { name: name, url: opt.home ? opt.home.replace('?', '?defaultPage=' + encodeURIComponent(out.pageId) + '&') : u, pageId: out.pageId, pageUid: out.pageUid, tfiltres: out.tfiltres, periodes: periodes(), vue: out.vue };
       var href = 'javascript:' + encodeURIComponent('(' + opt.applySrc + ')(' + JSON.stringify(V) + ');');
       zone.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-weight:bold"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:#1B7F3B;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px">' + (nstep + 1) + '</span>Rangez-le dans vos favoris</div>' +
         '<p style="margin:0 0 8px">Cliquez sur le bouton jaune, gardez le clic enfoncé et <b>faites-le glisser tout en haut de la fenêtre</b>, dans la barre de favoris, puis relâchez.</p>' +
@@ -217,6 +219,7 @@ var LD_VIEW_CAPTURE = function (opt) {
     function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function vis(e) { return !!(e && (e.offsetWidth || e.offsetHeight)); }
     function toolbar() { return Array.prototype.filter.call(D.querySelectorAll('.editToolbar'), vis)[0] || null; }
+    if (!W.ddCtrl && opt.home) { location.href = opt.home; return; }
     if (!W.ddCtrl) { alertBox('Ouvrez d\'abord le tableau de bord RPE, puis cliquez de nouveau sur le favori "Assistant TdB RPE".'); return; }
     function alertBox(msg) { var a = D.createElement('div'); a.style.cssText = 'position:fixed;z-index:999999;right:16px;bottom:16px;max-width:360px;background:#D92424;color:#fff;padding:12px 16px;border-radius:8px;font:13px Arial,sans-serif'; a.textContent = msg; D.body.appendChild(a); setTimeout(function () { a.remove(); }, 6000); }
     var old = D.getElementById('ldGuide'); if (old) old.remove();
@@ -333,6 +336,7 @@ var LD_VIEW_APPLY = function (V) {
       D.body.appendChild(t);
       if (ok !== undefined) setTimeout(function () { t.remove(); }, 4000);
     }
+    if (!W.ddCtrl && V.url) { location.href = V.url; return; }
     if (!W.ddCtrl || !W.AxisEditor) { toast('Ouvrez d\'abord le tableau de bord RPE, puis relancez la présentation.', false); return; }
     function toolbar() {
       return Array.prototype.filter.call(D.querySelectorAll('.editToolbar'), function (tb) {
@@ -547,12 +551,18 @@ var LD_VIEWS = {
   captureScript: function () { return '(' + LD_VIEW_CAPTURE.toString() + ')();'; },
   minify: function (code) { return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n\s*/g, ' '); },
   /* favori "Capturer une présentation" : utilisable par tout utilisateur, sans console */
-  captureBookmarklet: function (pages) {
-    var code = '(' + LD_VIEW_CAPTURE.toString() + ')(' + JSON.stringify({ ui: true, guide: true, pages: pages || [], applySrc: LD_VIEWS.minify(LD_VIEW_APPLY.toString()) }) + ');';
+  /* adresse du TdB (page donnée) : sert à ouvrir automatiquement le tableau de bord si le favori est cliqué ailleurs */
+  homeUrl: function (pageId) {
+    var d = typeof LIENS_DATA !== 'undefined' ? LIENS_DATA : {}, p = d.params || {}, e = encodeURIComponent;
+    if (!d.baseUrl) return '';
+    return d.baseUrl + '?' + (pageId ? 'defaultPage=' + e(pageId) + '&' : '') + 'domain=' + e(p.domain || '') + '&user=' + e(p.user || '') + '&pass=' + e(p.pass || '');
+  },
+  captureBookmarklet: function (pages, home) {
+    var code = '(' + LD_VIEW_CAPTURE.toString() + ')(' + JSON.stringify({ ui: true, guide: true, home: home || LD_VIEWS.homeUrl(''), pages: pages || [], applySrc: LD_VIEWS.minify(LD_VIEW_APPLY.toString()) }) + ');';
     return 'javascript:' + encodeURIComponent(LD_VIEWS.minify(code));
   },
   applyScript: function (view) {
-    var V = { name: view.name, pageId: view.pageId, pageUid: view.pageUid, tfiltres: view.tfiltres || [], periodes: view.periodes || [], vue: view.vue };
+    var V = { name: view.name, url: view.url || LD_VIEWS.homeUrl(view.pageId), pageId: view.pageId, pageUid: view.pageUid, tfiltres: view.tfiltres || [], periodes: view.periodes || [], vue: view.vue };
     return '(' + LD_VIEW_APPLY.toString() + ')(' + JSON.stringify(V) + ');';
   },
   bookmarklet: function (view) {
