@@ -62,6 +62,10 @@ var LD_VIEW_CAPTURE = function (opt) {
       await sleep(1500);
       return fsig(fsnap().map(fplain)) === want;
     }
+    /* filtres propres au tableau (popup "Filtres..." de la barre Self Service) : ed.chart.dmsel.dimsToFilter */
+    function tfList(ed) { try { return (ed.chart.dmsel.dimsToFilter || []).slice(); } catch (e) { return []; } }
+    function tfJSON(ed) { return tfList(ed).map(function (f) { try { return JSON.parse(JSON.stringify(f)); } catch (e) { return null; } }).filter(Boolean); }
+    function tfText(ed) { return tfList(ed).map(function (f) { var n = f.dim && f.dim.name ? f.dim.name : ''; var t = ''; try { t = f.getFilterString(); } catch (e) { /* ignore */ } return (n ? n + ' : ' : '') + t; }); }
     var before = fsnap();
     wrap(W.AxisEditor, 'ed'); wrap(W.DragEditHandler, 'dh');
     try {
@@ -97,10 +101,13 @@ var LD_VIEW_CAPTURE = function (opt) {
       dimensions: titles('.editToolIconDim:not(.editToolIconDimDisabled)'),
       mesures: titles('.editToolIconMeasure:not(.editToolIconMeasureDisabled)'),
       filtres: before.map(fplain),
+      tfiltres: tfJSON(ed),
+      tfiltresTexte: tfText(ed),
+      tdates: tfList(ed).filter(function (f) { return f.dim && (f.dim.time || /^D_/.test(f.dim.id)); }).map(function (f) { var t = ''; try { t = f.getFilterString(); } catch (e) { /* ignore */ } return { dim: f.dim.id, nom: f.dim.name, texte: t }; }),
       vue: vue
     };
     var s = JSON.stringify(out);
-    var resume = out.dimensions.join(' x ') + (out.mesures.length ? ' | ' + out.mesures.join(', ') : '');
+    var resume = out.dimensions.join(' x ') + (out.mesures.length ? ' | ' + out.mesures.join(', ') : '') + (out.tfiltresTexte.length ? ' | Filtres : ' + out.tfiltresTexte.join(', ') : '');
     if (!opt.ui) {
       console.log('Présentation capturée : ' + resume + ' (' + s.length + ' caractères)');
       try { copy(s); console.log('Résultat copié dans le presse-papier : collez-le dans l\'admin, onglet Présentations'); } catch (e) { console.log(s); }
@@ -112,13 +119,20 @@ var LD_VIEW_CAPTURE = function (opt) {
       '<p style="margin:6px 0;color:#374151">' + esc(resume) + '</p>' +
       '<label style="display:block;font-size:12px;color:#374151;margin-top:8px">Nom du favori</label>' +
       '<input data-ld="name" type="text" value="' + esc(out.dimensions.join(' x ').slice(0, 60)) + '" style="width:100%;box-sizing:border-box;font:inherit;padding:7px 8px;border:1px solid #D1D5DB;border-radius:4px;margin:4px 0 10px">' +
+      out.tdates.map(function (d, i) {
+        return '<label style="display:block;font-size:12px;color:#374151">Période : ' + esc(d.nom) + '</label>' +
+          '<select data-ld="per" data-dim="' + esc(d.dim) + '" style="width:100%;box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid #D1D5DB;border-radius:4px;margin:4px 0 10px">' +
+          [['fixe', 'Mois fixe : ' + d.texte], ['dernier', 'Dernier mois disponible'], ['dernierN1', 'Même mois, année précédente'], ['12m', '12 derniers mois (cumul)'], ['12mN1', '12 mois précédents (13e au 24e mois, cumul)']]
+            .map(function (o) { return '<option value="' + o[0] + '">' + esc(o[1]) + '</option>'; }).join('') + '</select>';
+      }).join('') +
       '<button type="button" data-ld="make" style="' + btn + 'background:#293378;color:#fff;border:1px solid #293378">Créer le favori</button> ' +
       '<button type="button" data-ld="share" style="' + btn + 'background:#fff;color:#293378;border:1px solid #293378">Copier le code de partage</button>' +
       '<div data-ld="out" style="margin-top:10px"></div>');
     var zone = b.querySelector('[data-ld="out"]');
     b.querySelector('[data-ld="make"]').onclick = function () {
       var name = b.querySelector('[data-ld="name"]').value.trim() || 'Ma présentation';
-      var V = { name: name, pageId: out.pageId, pageUid: out.pageUid, filtres: out.filtres, vue: out.vue };
+      var periodes = Array.prototype.map.call(b.querySelectorAll('[data-ld="per"]'), function (sel) { return { dim: sel.getAttribute('data-dim'), mode: sel.value }; }).filter(function (x) { return x.mode !== 'fixe'; });
+      var V = { name: name, pageId: out.pageId, pageUid: out.pageUid, tfiltres: out.tfiltres, periodes: periodes, vue: out.vue };
       var href = 'javascript:' + encodeURIComponent('(' + opt.applySrc + ')(' + JSON.stringify(V) + ');');
       zone.innerHTML = '<p style="margin:0 0 6px">Faites glisser ce bouton dans votre <b>barre de favoris</b> :</p>' +
         '<a href="' + esc(href) + '" draggable="true" style="display:inline-block;background:#FFCC52;color:#0D1440;font-weight:bold;text-decoration:none;padding:7px 12px;border-radius:4px">' + esc(name) + '</a>' +
@@ -204,6 +218,16 @@ var LD_VIEW_APPLY = function (V) {
       await sleep(1500);
       return fsig(fsnap().map(fplain)) === want;
     }
+    /* filtres propres au tableau (popup "Filtres..." de la barre Self Service) : ed.chart.dmsel.dimsToFilter */
+    function tfList(ed) { try { return (ed.chart.dmsel.dimsToFilter || []).slice(); } catch (e) { return []; } }
+    function tfJSON(ed) { return tfList(ed).map(function (f) { try { return JSON.parse(JSON.stringify(f)); } catch (e) { return null; } }).filter(Boolean); }
+    function tfText(ed) { return tfList(ed).map(function (f) { var n = f.dim && f.dim.name ? f.dim.name : ''; var t = ''; try { t = f.getFilterString(); } catch (e) { /* ignore */ } return (n ? n + ' : ' : '') + t; }); }
+    function tfFromJSON(dm, j) {
+      var f = null;
+      try { if (dm.castFilterSelection) f = dm.castFilterSelection(j); } catch (e) { f = null; }
+      if (!f || !f.getFilterString) { try { var x = new W.DataModelSelectionFromJSON({ dimsToFilter: [j] }, dm.dm); f = x.dmsel && x.dmsel.dimsToFilter ? x.dmsel.dimsToFilter[0] : null; } catch (e) { f = null; } }
+      return f && f.getFilterString ? f : null;
+    }
     var before = fsnap();
     wrap(W.AxisEditor, 'ed'); wrap(W.DragEditHandler, 'dh');
     try {
@@ -226,13 +250,61 @@ var LD_VIEW_APPLY = function (V) {
     }
     var ed = cap.ed || (cap.dh ? findEd(cap.dh, 0, []) : null);
     if (!ed) { toast('Éditeur du tableau introuvable : la version de DigDash a peut-être changé.', false); return; }
+    var tBefore = tfList(ed).map(function (f) { return f.clone ? f.clone() : f; });
+    var tExcl = {};
+    try { var ex0 = ed.chart.dmsel.dimensionsToExcludeForNavigation || {}; Object.keys(ex0).forEach(function (k) { tExcl[k] = ex0[k]; }); } catch (e) { /* ignore */ }
     try { ed.applyViewJSON(V.vue); } catch (e) { toast('Échec de l\'application : ' + (e && e.message || e), false); return; }
     await sleep(1500);
-    /* filtres en place (lien, panneau) prioritaires ; filtres de la capture ajoutés pour les autres dimensions */
-    var keep = before.slice(), seenDims = before.map(function (o) { return o.dimId; });
-    (V.filtres || []).forEach(function (p) { if (seenDims.indexOf(p.dimId) < 0) { var o = fop(p); if (o) keep.push(o); } });
-    var ok = await frestore(keep);
-    toast('Présentation "' + V.name + '" appliquée' + (keep.length ? (ok ? ', filtres conservés (' + keep.length + ').' : '. Attention : certains filtres n\'ont pas pu être remis.') : '.'), ok ? true : false);
+    /* 1. filtres du tableau de bord (lien) : remis seulement s'ils ont été effacés */
+    var dashOk = true;
+    if (fsig(fsnap().map(fplain)) !== fsig(before.map(fplain))) dashOk = await frestore(before);
+    /* 2. filtres du tableau : ceux en place sont prioritaires, ceux de la capture complètent les autres dimensions */
+    var dm = ed.chart.dmsel, list = tBefore.slice(), have = {}, ko = [];
+    list.forEach(function (f) { have[f.dim && f.dim.id ? f.dim.id : f.dim] = 1; });
+    /* périodes relatives (dernier mois, N-1, 12 mois glissants...) calculées sur les mois disponibles au moment du clic : elles remplacent le filtre de date en place */
+    var perTxt = [];
+    (V.periodes || []).forEach(function (pr) {
+      var base = null;
+      (V.tfiltres || []).forEach(function (j) { if (j.dim === pr.dim) base = j; });
+      if (!base) return;
+      var f0 = tfFromJSON(dm, base);
+      var mem = f0 && f0.dim && f0.dim.members ? f0.dim.members.filter(function (x) { return typeof x === 'number'; }) : [];
+      if (!mem.length) { ko.push(pr.dim); return; }
+      function key(t) { var d = new Date(t * 1000); return d.getFullYear() * 12 + d.getMonth(); }
+      var byKey = {}, last = -Infinity;
+      mem.forEach(function (t) { var k = key(t); byKey[k] = t; if (k > last) last = k; });
+      var from = last, to = last;
+      if (pr.mode === 'dernierN1') { from = to = last - 12; }
+      else if (pr.mode === '12m') { from = last - 11; }
+      else if (pr.mode === '12mN1') { from = last - 23; to = last - 12; }
+      var sel = [];
+      for (var k = from; k <= to; k++) if (byKey[k] !== undefined) sel.push(byKey[k]);
+      if (!sel.length) { ko.push(pr.dim); return; }
+      var j2 = {}; Object.keys(base).forEach(function (x) { if (x !== 'origIds') j2[x] = base[x]; });
+      j2.selectedMembers = sel;
+      var f2 = tfFromJSON(dm, j2);
+      if (!f2) { ko.push(pr.dim); return; }
+      try { if (f2.recalcIds) f2.recalcIds(); } catch (e) { /* ignore */ }
+      list = list.filter(function (f) { return (f.dim && f.dim.id ? f.dim.id : f.dim) !== pr.dim; });
+      list.push(f2); have[pr.dim] = 1;
+      perTxt.push(sel.length + ' mois');
+    });
+    (V.tfiltres || []).forEach(function (j) { if (have[j.dim]) return; var f = tfFromJSON(dm, j); if (f) { list.push(f); have[j.dim] = 1; } else ko.push(j.dim); });
+    var tabOk = true;
+    if (list.length) {
+      try {
+        dm.removeFilters();
+        list.forEach(function (f) { dm.setFilter(f.clone ? f.clone() : f); });
+        var ex = dm.dimensionsToExcludeForNavigation || (dm.dimensionsToExcludeForNavigation = {});
+        Object.keys(tExcl).forEach(function (k) { ex[k] = tExcl[k]; });
+        Object.keys(have).forEach(function (k) { ex[k] = true; });
+        try { ed.refreshDM(); } catch (e1) { try { ed.onDimFilterChange(); } catch (e2) { tabOk = false; } }
+      } catch (e) { tabOk = false; }
+    }
+    await sleep(800);
+    var txt = tfText(ed);
+    var ok = dashOk && tabOk && !ko.length;
+    toast('Présentation "' + V.name + '" appliquée' + (txt.length ? '. Filtres : ' + txt.join(' | ') : '') + (ok ? '.' : '. Attention : certains filtres n\'ont pas pu être remis' + (ko.length ? ' (' + ko.join(', ') + ')' : '') + '.'), ok);
   })();
 };
 
@@ -246,7 +318,7 @@ var LD_VIEWS = {
     return 'javascript:' + encodeURIComponent(LD_VIEWS.minify(code));
   },
   applyScript: function (view) {
-    var V = { name: view.name, pageId: view.pageId, pageUid: view.pageUid, filtres: view.filtres || [], vue: view.vue };
+    var V = { name: view.name, pageId: view.pageId, pageUid: view.pageUid, tfiltres: view.tfiltres || [], periodes: view.periodes || [], vue: view.vue };
     return '(' + LD_VIEW_APPLY.toString() + ')(' + JSON.stringify(V) + ');';
   },
   bookmarklet: function (view) {
