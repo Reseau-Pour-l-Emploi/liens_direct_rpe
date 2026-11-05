@@ -86,6 +86,7 @@ select:focus,.btn:focus-visible,.theme-btn:focus-visible,.page-btn:focus-visible
 .fsel{flex:1 1 200px;max-width:280px}
 .fblock{border:1px solid var(--ft-border);border-radius:8px;padding:10px;margin-bottom:10px;background:#fff}
 .fblock .frow{margin-bottom:6px}
+.fdate{max-width:280px;width:100%}
 .fcount{font-size:12px;color:var(--ft-fg-3);flex:1}
 .pills{display:flex;flex-wrap:wrap;gap:6px}
 .pill{font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:999px;border:1px solid var(--ft-gray-300);background:#fff;color:var(--ft-fg-2);cursor:pointer}
@@ -249,6 +250,12 @@ document.addEventListener('DOMContentLoaded', function () {
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function filtersOf(p) { return (p.filters || []).filter(function (f) { return f.enabled !== false && !f.tree && !f.geo && f.values && f.values.length; }); }
   function fByDim(p, dim) { var l = filtersOf(p); for (var i = 0; i < l.length; i++) if (l[i].dim === dim) return l[i]; return null; }
+  /* valeurs de date : identifiant numérique (préfixe technique retiré), une seule fois chacune, de la plus récente à la plus ancienne */
+  function dateVals(f) {
+    var seen = {}, out = [];
+    f.values.forEach(function (v) { var n = String(v.v).replace(/^combo_result_/, ''); if (!seen[n]) { seen[n] = 1; out.push({ v: n, l: v.l }); } });
+    return out.sort(function (a, b) { return (+b.v) - (+a.v); });
+  }
   function sortL(a) { return a.slice().sort(function (x, y) { return x.l.localeCompare(y.l, 'fr'); }); }
   function cur() { return byId[state.page] || null; }
   function geoOn(p) { return !!(geo && p && p.applyGlobals !== false); }
@@ -351,12 +358,17 @@ document.addEventListener('DOMContentLoaded', function () {
         var opts = '<option value="">Choisir un filtre</option>' + fs.filter(function (x) { return x.dim === r.dim || !used[x.dim]; }).map(function (x) {
           return '<option value="' + esc(x.dim) + '"' + (x.dim === r.dim ? ' selected' : '') + '>' + esc(x.alias || x.label) + '</option>';
         }).join('');
-        var pills = f ? '<div class="pills" role="group" aria-label="Valeurs ' + esc(f.alias || f.label) + '">' + sortL(f.values).map(function (v) {
+        var isDate = f && (/^D_/.test(f.dim) || f.values.every(function (v) { return /^(combo_result_)?\d{9,11}$/.test(v.v); }));
+        /* dates : choix unique, de la plus récente à la plus ancienne */
+        var pills = !f ? '' : isDate ?
+          '<select class="fsel fdate" data-rowd="' + i + '" aria-label="' + esc(f.alias || f.label) + '"><option value="">Choisir une date</option>' +
+            dateVals(f).map(function (v) { return '<option value="' + esc(v.v) + '"' + (r.vals[0] === v.v ? ' selected' : '') + '>' + esc(v.l) + '</option>'; }).join('') + '</select>' :
+'<div class="pills" role="group" aria-label="Valeurs ' + esc(f.alias || f.label) + '">' + sortL(f.values).map(function (v) {
           var on = r.vals.indexOf(v.v) >= 0;
           return '<button type="button" class="pill' + (on ? ' on' : '') + '" aria-pressed="' + on + '" data-pill="' + i + '" data-val="' + esc(v.v) + '">' + (on ? ICO.check : '') + esc(v.l) + '</button>';
-        }).join('') + '</div>' : '';
+        }).join('') + '</div>';
         return '<div class="fblock"><div class="frow"><select class="fsel" data-row="' + i + '" aria-label="Filtre">' + opts + '</select>' +
-          (f ? '<span class="fcount">' + (r.vals.length ? r.vals.length + ' valeur' + (r.vals.length > 1 ? 's' : '') + ' choisie' + (r.vals.length > 1 ? 's' : '') : 'Cochez une ou plusieurs valeurs') + '</span>' : '') +
+          (f ? '<span class="fcount">' + (isDate ? 'Une seule date' : r.vals.length ? r.vals.length + ' valeur' + (r.vals.length > 1 ? 's' : '') + ' choisie' + (r.vals.length > 1 ? 's' : '') : 'Cochez une ou plusieurs valeurs') + '</span>' : '') +
           '<button class="btn btn--icon btn--ghost" type="button" data-del="' + i + '" title="Retirer ce filtre">' + ICO.x + '</button></div>' + pills + '</div>';
       }).join('');
       var free = fs.length - state.rows.filter(function (r) { return r.dim; }).length;
@@ -394,6 +406,8 @@ document.addEventListener('DOMContentLoaded', function () {
     } else if (t.hasAttribute('data-row')) {
       var r = state.rows[+t.getAttribute('data-row')];
       r.dim = t.value; r.vals = [];
+    } else if (t.hasAttribute('data-rowd')) {
+      state.rows[+t.getAttribute('data-rowd')].vals = t.value ? [t.value] : [];
     } else return;
     renderFilters(); changed();
   });
@@ -424,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function () {
     state.rows.forEach(function (r) {
       if (!r.dim || !r.vals.length) return;
       var f = fByDim(p, r.dim);
-      var l = r.vals.map(function (x) { var t = x; f.values.forEach(function (v) { if (v.v === x) t = v.l; }); return t; });
+      var l = r.vals.map(function (x) { var t = x; f.values.forEach(function (v) { if (v.v === x || String(v.v).replace(/^combo_result_/, '') === x) t = v.l; }); return t; });
       h += '<span class="chip">' + esc(f.alias || f.label) + ' : <b>' + esc(l.join(', ')) + '</b></span>';
     });
     return h;
@@ -503,13 +517,13 @@ document.addEventListener('DOMContentLoaded', function () {
   var wz = { step: 0, tp: '', last: null };
   function lsGetW(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSetW(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
-  var WZ_STEPS = ['Choisir le tableau', 'Installer l\'outil', 'Mettre en forme', 'Capturer', 'C\'est prêt'];
+  var WZ_STEPS = ['Choisir le tableau', 'Installer l\'assistant', 'Lancer l\'assistant', 'C\'est prêt'];
   var DEMO = '<svg viewBox="0 0 340 130" width="340" height="130" role="img" aria-label="Glisser le bouton jaune vers la barre de favoris">' +
     '<rect x="1" y="1" width="338" height="128" rx="8" fill="#fff" stroke="#D1D5DB"/><rect x="1" y="1" width="338" height="24" rx="8" fill="#E5E7EB"/>' +
     '<circle cx="14" cy="13" r="4" fill="#D92424"/><circle cx="26" cy="13" r="4" fill="#FFCC52"/><circle cx="38" cy="13" r="4" fill="#1B7F3B"/>' +
     '<rect x="1" y="25" width="338" height="22" fill="#F5F2EE"/><text x="10" y="40" font-size="10" fill="#6B7280" font-family="Arial">Barre de favoris</text>' +
     '<rect x="110" y="29" width="120" height="15" rx="4" fill="none" stroke="#293378" stroke-dasharray="4 3"/>' +
-    '<rect x="160" y="92" width="150" height="24" rx="5" fill="#FFCC52"/><text x="235" y="108" font-size="11" font-weight="bold" fill="#0D1440" text-anchor="middle" font-family="Arial">Capturer une présentation</text>' +
+    '<rect x="160" y="92" width="150" height="24" rx="5" fill="#FFCC52"/><text x="235" y="108" font-size="11" font-weight="bold" fill="#0D1440" text-anchor="middle" font-family="Arial">Assistant TdB RPE</text>' +
     '<path d="M200 88 C 190 70, 180 60, 172 50" fill="none" stroke="#293378" stroke-width="2.5" marker-end="url(#ar)"/>' +
     '<defs><marker id="ar" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#293378"/></marker></defs></svg>';
   function wzBody() {
@@ -519,34 +533,25 @@ document.addEventListener('DOMContentLoaded', function () {
         tpPages.map(function (t) { return '<button type="button" class="tp' + (t.id === wz.tp ? ' sel' : '') + '" data-tp="' + esc(t.id) + '"><b>' + esc(tpName(t)) + '</b><span>Tableau personnalisé</span></button>'; }).join('') + '</div>';
     } else if (wz.step === 1) {
       var inst = lsGetW('ld-capture-installed') === '1';
-      h = '<h3>Installez l\'outil de capture</h3><p class="sub">À faire <b>une seule fois</b> : ensuite, l\'outil restera dans votre navigateur.</p>' +
+      h = '<h3>Installez l\'assistant dans votre navigateur</h3><p class="sub">À faire <b>une seule fois</b>. L\'assistant vous guidera ensuite directement dans le tableau de bord, sans aller-retour entre deux pages.</p>' +
         '<ol class="do"><li>Affichez la <b>barre de favoris</b> de votre navigateur : appuyez en même temps sur <b>Ctrl + Maj + B</b>. Une barre apparaît sous la barre d\'adresse.</li>' +
         '<li>Cliquez sur le bouton jaune ci-dessous, <b>gardez le clic enfoncé</b>, faites-le glisser jusque dans cette barre, puis relâchez.</li></ol>' +
         '<div class="drag-demo">' + DEMO + '</div>' +
-        '<div style="text-align:center"><a class="bm-btn" draggable="true" href="' + esc(LD_VIEWS.captureBookmarklet(tpPages.map(function (t) { return { name: tpName(t), uid: t.uid }; }))) + '" title="Faites-moi glisser vers la barre de favoris">' + ICO.grid + 'Capturer une présentation</a></div>' +
+        '<div style="text-align:center"><a class="bm-btn" draggable="true" href="' + esc(LD_VIEWS.captureBookmarklet(tpPages.map(function (t) { return { name: tpName(t), uid: t.uid }; }))) + '" title="Faites-moi glisser vers la barre de favoris">' + ICO.grid + 'Assistant TdB RPE</a></div>' +
         '<div class="tip">Le bouton ne réagit pas au clic, c\'est normal : il faut le <b>faire glisser</b>. S\'il refuse de se déposer, votre poste bloque peut-être ce type de favori : contactez l\'équipe qui gère cette page.</div>' +
-        '<label class="check"><input type="checkbox" id="wzInst"' + (inst ? ' checked' : '') + '> Le bouton "Capturer une présentation" est dans ma barre de favoris</label>';
+        '<label class="check"><input type="checkbox" id="wzInst"' + (inst ? ' checked' : '') + '> Le bouton "Assistant TdB RPE" est dans ma barre de favoris</label>';
     } else if (wz.step === 2) {
-      h = '<h3>Ouvrez le tableau et mettez-le en forme</h3><p class="sub">Tableau choisi : <b>' + esc(p ? tpName(p) : '') + '</b>. Il s\'ouvre dans un nouvel onglet : <b>gardez cette page ouverte</b> pour la suite.</p>' +
-        '<p><a class="btn btn--lg" target="_blank" rel="noopener" id="wzGo" href="' + esc(p ? LD.buildUrl(DATA, p, {}, null) : '#') + '">' + ICO.open + 'Ouvrir le tableau personnalisé</a></p>' +
-        '<ol class="do"><li><b>Lignes et colonnes</b> : à gauche du tableau, dans la liste <b>Dimensions</b>, faites glisser une dimension (par exemple Sexe ou Niveau de formation) sur l\'en-tête du tableau.</li>' +
-        '<li><b>Chiffres affichés</b> : plus bas dans la même liste, sous <b>Mesures</b>, faites glisser la mesure voulue dans le tableau.</li>' +
-        '<li><b>Filtres</b> : cliquez sur l\'icône en forme d\'<b>entonnoir</b> en haut de la liste, puis <b>Ajouter un filtre</b> : territoire, sexe, date... Validez par <b>OK</b>.</li>' +
-        '<li>Vérifiez que le tableau affiche ce que vous voulez retrouver.</li></ol>' +
-        '<div class="tip">Vous vous êtes trompé ? Appuyez sur <b>F5</b> pour revenir au tableau d\'origine et recommencez.</div>';
-    } else if (wz.step === 3) {
-      h = '<h3>Capturez votre tableau</h3><p class="sub">Toujours dans l\'onglet du tableau de bord :</p>' +
-        '<ol class="do"><li>Cliquez sur le favori <b>Capturer une présentation</b> dans votre barre de favoris.</li>' +
-        '<li>Une fenêtre s\'ouvre <b>en bas à droite</b> du tableau de bord. Si votre tableau contient une date, choisissez la <b>période</b> : dernier mois disponible, 12 derniers mois, un mois au choix...</li>' +
-        '<li>Vérifiez le <b>nom</b> proposé, puis cliquez sur <b>Créer le favori</b>.</li>' +
-        '<li>Faites glisser le <b>bouton jaune</b> qui apparaît jusque dans la barre de favoris, comme à l\'étape 2.</li></ol>' +
-        '<div class="tip">Avec une période "dernier mois" ou "12 derniers mois", le favori suit automatiquement les mises à jour des données : inutile de le recréer chaque mois.</div>';
+      h = '<h3>Lancez l\'assistant dans le tableau de bord</h3><p class="sub">Tableau choisi : <b>' + esc(p ? tpName(p) : '') + '</b>.</p>' +
+        '<ol class="do"><li>Ouvrez le tableau : <a class="btn" target="_blank" rel="noopener" id="wzGo" href="' + esc(p ? LD.buildUrl(DATA, p, {}, null) : '#') + '">' + ICO.open + 'Ouvrir le tableau personnalisé</a></li>' +
+        '<li>Dans l\'onglet du tableau de bord, cliquez sur le favori <b>Assistant TdB RPE</b> de votre barre de favoris.</li>' +
+        '<li>Une fenêtre d\'aide s\'ouvre <b>à droite du tableau de bord</b>. Suivez-la : elle vous montre où cliquer pour mettre le tableau en forme, puis vous aide à l\'enregistrer dans vos favoris.</li></ol>' +
+        '<div class="tip">Vous pouvez fermer cette page : toute la suite se passe dans le tableau de bord.</div>';
     } else {
-      h = '<h3>C\'est prêt</h3><p class="sub">Votre présentation est enregistrée dans vos favoris.</p>' +
-        '<ol class="do"><li>Pour retrouver votre tableau : ouvrez le tableau de bord, puis cliquez sur votre favori. La bonne page s\'ouvre et le tableau se met en forme, avec vos filtres.</li>' +
+      h = '<h3>Pour retrouver votre tableau</h3><p class="sub">Une fois votre présentation enregistrée :</p>' +
+        '<ol class="do"><li>Ouvrez le tableau de bord, puis cliquez sur le favori de votre présentation. La bonne page s\'ouvre et le tableau se met en forme, avec vos filtres.</li>' +
         '<li>Un message en bas à droite confirme la mise en forme et liste les filtres appliqués.</li>' +
-        '<li>Vous pouvez créer autant de présentations que vous voulez : recommencez à l\'étape 1 (inutile de réinstaller l\'outil).</li></ol>' +
-        '<p><button class="btn btn--secondary" type="button" id="wzAgain">Créer une autre présentation</button></p>';
+        '<li>Pour créer une autre présentation, cliquez simplement de nouveau sur <b>Assistant TdB RPE</b> dans le tableau de bord.</li></ol>' +
+        '<p><button class="btn btn--secondary" type="button" id="wzAgain">Choisir un autre tableau</button></p>';
     }
     return h;
   }
