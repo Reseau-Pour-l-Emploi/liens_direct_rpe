@@ -93,6 +93,8 @@ input[type=text],input[type=search],select{font:inherit;font-size:13px;padding:6
 .rep summary{cursor:pointer;font-weight:500}
 .filters-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .filters-bar input[type=search]{flex:1 1 240px}
+.tests{margin:0;padding-left:20px;font-size:13px}
+.tests li{margin:6px 0}
 .kpis{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .kpi{background:#fff;border:1px solid var(--ft-border);border-radius:8px;padding:12px 16px;min-width:140px}
 .kpi b{display:block;font-size:22px}
@@ -124,45 +126,27 @@ input[type=text],input[type=search],select{font:inherit;font-size:13px;padding:6
   </div>
 
   <nav class="tabs" id="tabs">
-    <button class="tab active" data-tab="extraction" type="button">1. Extraction</button>
-    <button class="tab" data-tab="import" type="button">2. Import</button>
-    <button class="tab" data-tab="pages" type="button">3. Pages et filtres</button>
-    <button class="tab" data-tab="params" type="button">4. Territoire et paramètres</button>
-    <button class="tab" data-tab="views" type="button">5. Présentations</button>
-    <button class="tab" data-tab="export" type="button">6. Publication</button>
+    <button class="tab active" data-tab="maj" type="button">1. Mettre à jour</button>
+    <button class="tab" data-tab="views" type="button">2. Présentations</button>
+    <button class="tab" data-tab="reglages" type="button">3. Réglages et tests (facultatif)</button>
   </nav>
 
-  <!-- 1. Extraction -->
-  <section data-panel="extraction">
+  <!-- 1. Mettre à jour -->
+  <section data-panel="maj">
+    <div class="kpis" id="kpis"></div>
     <div class="card">
-      <h2>Relever automatiquement les pages et les filtres du tableau de bord</h2>
+      <h2>1. Relever les pages et les filtres du tableau de bord</h2>
       <ol class="steps">
         <li>Ouvrez le tableau de bord dans un nouvel onglet : <a class="btn btn--secondary btn--sm" id="openTdb" target="_blank" rel="noopener" href="#">Ouvrir le tableau de bord</a>. Attendez que la page d'accueil soit affichée.</li>
         <li>Ouvrez la console du navigateur : touche <code>F12</code>, onglet <b>Console</b>.</li>
         <li>Cliquez sur <button class="btn btn--sm" id="copyScript" type="button">Copier le script</button>, collez-le dans la console puis appuyez sur <code>Entrée</code>.<br>
           <span class="mono" style="color:var(--ft-fg-3)">Si le navigateur bloque le collage, tapez d'abord <code>allow pasting</code> (Chrome) ou <code>autoriser le collage</code> (Edge), puis <code>Entrée</code>.</span></li>
         <li>Laissez l'onglet au premier plan. Le script ouvre les pages une à une (environ <b id="estim">5 min</b>). Un bandeau en bas à droite indique la progression et permet d'arrêter.</li>
-        <li>À la fin, le fichier <code>extraction-digdash-AAAA-MM-JJ.json</code> est téléchargé. Importez-le dans l'onglet <b>2. Import</b>.</li>
+        <li>À la fin, le fichier <code>extraction-digdash-AAAA-MM-JJ.json</code> est téléchargé. Importez-le à l'étape 2 ci-dessous.</li>
       </ol>
     </div>
-    <div class="help">
-      <b>À savoir</b>
-      <ul style="margin:6px 0 0;padding-left:20px">
-        <li>Le script lit la page sans rien modifier dans DigDash. Les pages DDAudit (fréquentation, système) sont exclues.</li>
-        <li>Il relève, pour chaque page, les listes de filtres présentes dans la page (volet "Filtres" compris) avec leurs valeurs, et la liste des territoires du panneau de filtres global.</li>
-        <li>Les valeurs relevées sont celles affichées au moment de l'extraction, pour le compte public. Relancez l'extraction après une évolution du tableau de bord (nouvelle page, nouveau filtre, nouveau millésime).</li>
-      </ul>
-    </div>
-    <details class="card">
-      <summary style="cursor:pointer;font-weight:500">Voir le script</summary>
-      <textarea class="script" id="scriptView" readonly></textarea>
-    </details>
-  </section>
-
-  <!-- 2. Import -->
-  <section data-panel="import" hidden>
     <div class="card">
-      <h2>Importer une extraction</h2>
+      <h2>2. Importer l'extraction</h2>
       <label class="drop" id="drop" for="fileExt">Déposez ici le fichier <code>extraction-digdash-....json</code> ou cliquez pour le choisir</label>
       <input type="file" id="fileExt" accept=".json,application/json" hidden>
       <p style="margin:12px 0 0"><label><input type="checkbox" id="keepMissing"> Conserver les pages absentes de l'extraction (extraction interrompue ou partielle)</label></p>
@@ -175,58 +159,29 @@ input[type=text],input[type=search],select{font:inherit;font-size:13px;padding:6
         <button class="btn btn--ghost" id="cancelImport" type="button">Annuler</button>
       </div>
     </div>
-    <div class="help">Vos réglages sont conservés à l'import : pages masquées, libellés et notes, filtres désactivés, filtres renommés. Les nouvelles pages hors menu sont masquées par défaut. Les nouveaux filtres sont activés par défaut.</div>
+    <div class="card">
+      <h2>3. Publier</h2>
+      <ol class="steps">
+        <li>Téléchargez le fichier de configuration : <button class="btn btn--sm" id="dlData" type="button">Télécharger liens-directs-data.js</button></li>
+        <li>Dans le dépôt, remplacez <code>data/liens-directs-data.js</code> par ce fichier, puis validez (commit). La page publique est mise à jour au déploiement suivant.</li>
+        <li>Une fois publié, supprimez le brouillon local : <button class="btn btn--ghost btn--sm" id="clearDraft" type="button">Supprimer le brouillon</button></li>
+      </ol>
+    </div>
+    <details class="help">
+      <summary style="cursor:pointer;font-weight:700">À savoir</summary>
+      <ul style="margin:6px 0 0;padding-left:20px">
+        <li>Le script lit le tableau de bord sans rien y modifier. Les pages DDAudit et le bloc Focus RSA sont exclus. Relancez l'extraction après une évolution du tableau de bord (nouvelle page, nouveau filtre, nouveau millésime).</li>
+        <li>Vos réglages sont conservés à l'import : pages masquées, libellés, notes, filtres désactivés ou renommés, présentations.</li>
+        <li>Cette page ne modifie rien en ligne : elle produit le fichier à déposer dans le dépôt. Vos modifications restent dans ce navigateur (brouillon) jusqu'à leur publication.</li>
+      </ul>
+    </details>
+    <details class="card">
+      <summary style="cursor:pointer;font-weight:500">Voir le script</summary>
+      <textarea class="script" id="scriptView" readonly></textarea>
+    </details>
   </section>
 
-  <!-- 3. Pages -->
-  <section data-panel="pages" hidden>
-    <div class="card">
-      <div class="filters-bar">
-        <input type="search" id="pq" placeholder="Rechercher une page, un filtre, un identifiant">
-        <select id="pf">
-          <option value="all">Toutes les pages</option>
-          <option value="visible">Pages affichées</option>
-          <option value="hidden">Pages masquées</option>
-          <option value="filters">Pages avec filtres</option>
-          <option value="check">Filtres à vérifier</option>
-        </select>
-        <span id="pcount" style="font-size:12px;color:var(--ft-fg-3)"></span>
-      </div>
-      <div style="overflow-x:auto">
-        <table class="tbl">
-          <thead><tr><th>Affichée</th><th style="min-width:220px">Page</th><th style="min-width:180px">Libellé affiché</th><th style="min-width:180px">Note</th><th title="Le territoire choisi en haut de la page publique s'applique à cette page">Territoire</th><th>Filtres proposés</th><th>Test</th></tr></thead>
-          <tbody id="ptbody"></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="help"><b>Lecture.</b> Décochez "Affichée" pour retirer une page de la page publique. Un libellé vide reprend le titre du menu DigDash. Un filtre marqué <span class="badge badge--warn">à vérifier</span> n'a pas pu être rattaché avec certitude à une dimension : testez-le avant de le laisser actif. "Tester" ouvre la page avec la première valeur du filtre.</div>
-  </section>
-
-  <!-- 4. Paramètres -->
-  <section data-panel="params" hidden>
-    <div class="card">
-      <h2>Filtres territoriaux transverses</h2>
-      <p style="margin:0 0 12px;font-size:13px;color:var(--ft-fg-2)">Proposés en haut de la page publique et appliqués à tous les liens des pages cochées "Territoire". Testez chaque niveau avant de l'activer.</p>
-      <div style="overflow-x:auto">
-        <table class="tbl">
-          <thead><tr><th>Actif</th><th>Libellé</th><th style="min-width:300px">Dimension et niveaux</th><th style="min-width:260px">Paramètres complémentaires</th><th>Valeurs</th><th style="min-width:260px">Test</th><th></th></tr></thead>
-          <tbody id="gtbody"></tbody>
-        </table>
-      </div>
-      <p style="font-size:12px;color:var(--ft-fg-3);margin:8px 0 0">Liste arborescente (Région > Département > CLPE) : la hiérarchie et le niveau (<code>H...</code> et <code>L...</code>) sont ajoutés automatiquement selon le niveau choisi. Renommez un niveau si besoin (ex. Territoire en CLPE). Autres cas, paramètres complémentaires : par exemple <code>HC_TERRITOIRE_ID=National&amp;LC_TERRITOIRE_ID=Territoire</code> pour préciser la hiérarchie et le niveau d'une dimension hiérarchique.</p>
-    </div>
-    <div class="card">
-      <h2>Accès au tableau de bord</h2>
-      <div class="form-grid">
-        <div class="field" style="grid-column:1/-1"><label for="pBase">Adresse du tableau de bord</label><input type="text" id="pBase" data-param="baseUrl"></div>
-        <div class="field"><label for="pDomain">domain</label><input type="text" id="pDomain" data-param="domain"></div>
-        <div class="field"><label for="pUser">user</label><input type="text" id="pUser" data-param="user"></div>
-        <div class="field"><label for="pPass">pass (compte public)</label><input type="text" id="pPass" data-param="pass" autocomplete="off"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 5. Présentations de Tableaux personnalisés -->
+  <!-- 2. Présentations -->
   <section data-panel="views" hidden>
     <div class="card">
       <h2>Créer une présentation automatique</h2>
@@ -253,16 +208,58 @@ input[type=text],input[type=search],select{font:inherit;font-size:13px;padding:6
     </div>
   </section>
 
-  <!-- 6. Publication -->
-  <section data-panel="export" hidden>
-    <div class="kpis" id="kpis"></div>
+  <!-- 3. Réglages et tests (facultatif) -->
+  <section data-panel="reglages" hidden>
+    <div class="help">Rien n'est obligatoire ici : les réglages par défaut conviennent. Utilisez cet onglet pour masquer une page, renommer un filtre, ajuster le territoire ou faire des vérifications.</div>
     <div class="card">
-      <h2>Publier la configuration</h2>
-      <ol class="steps">
-        <li>Téléchargez le fichier de configuration : <button class="btn btn--sm" id="dlData" type="button">Télécharger liens-directs-data.js</button></li>
-        <li>Dans le dépôt, remplacez <code>data/liens-directs-data.js</code> par ce fichier, puis validez (commit). La page publique est mise à jour au déploiement suivant.</li>
-        <li>Une fois publié, supprimez le brouillon local : <button class="btn btn--ghost btn--sm" id="clearDraft" type="button">Supprimer le brouillon</button></li>
-      </ol>
+      <h2>Tests facultatifs</h2>
+      <p style="margin:0 0 8px;font-size:13px;color:var(--ft-fg-2)">À faire après une extraction qui ajoute des pages ou des filtres, ou après une mise à jour de DigDash.</p>
+      <ul class="tests">
+        <li><b>Filtre de page</b> : tableau ci-dessous, bouton "Tester" d'un filtre marqué <span class="badge badge--warn">à vérifier</span>. Désactivez-le s'il n'est pas appliqué dans le tableau de bord.</li>
+        <li><b>Territoire</b> : carte "Filtres territoriaux", choisissez un CLPE puis "Tester" : le fil d'Ariane doit afficher Région > Département > CLPE.</li>
+        <li><b>Présentations</b> : onglet 2, cliquez sur un favori depuis le tableau de bord : le message en bas à droite doit lister les filtres sans avertissement.</li>
+        <li><b>Page publique</b> : ouvrez un lien généré avec deux valeurs d'un même filtre et un territoire.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="filters-bar">
+        <input type="search" id="pq" placeholder="Rechercher une page, un filtre, un identifiant">
+        <select id="pf">
+          <option value="all">Toutes les pages</option>
+          <option value="visible">Pages affichées</option>
+          <option value="hidden">Pages masquées</option>
+          <option value="filters">Pages avec filtres</option>
+          <option value="check">Filtres à vérifier</option>
+        </select>
+        <span id="pcount" style="font-size:12px;color:var(--ft-fg-3)"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Affichée</th><th style="min-width:220px">Page</th><th style="min-width:180px">Libellé affiché</th><th style="min-width:180px">Note</th><th title="Le territoire choisi en haut de la page publique s'applique à cette page">Territoire</th><th>Filtres proposés</th><th>Test</th></tr></thead>
+          <tbody id="ptbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="help"><b>Lecture.</b> Décochez "Affichée" pour retirer une page de la page publique. Un libellé vide reprend le titre du menu DigDash. Un filtre marqué <span class="badge badge--warn">à vérifier</span> n'a pas pu être rattaché avec certitude à une dimension : testez-le avant de le laisser actif. "Tester" ouvre la page avec la première valeur du filtre.</div>
+    <div class="card">
+      <h2>Filtres territoriaux transverses</h2>
+      <p style="margin:0 0 12px;font-size:13px;color:var(--ft-fg-2)">Proposés en haut de la page publique et appliqués à tous les liens des pages cochées "Territoire". Testez chaque niveau avant de l'activer.</p>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Actif</th><th>Libellé</th><th style="min-width:300px">Dimension et niveaux</th><th style="min-width:260px">Paramètres complémentaires</th><th>Valeurs</th><th style="min-width:260px">Test</th><th></th></tr></thead>
+          <tbody id="gtbody"></tbody>
+        </table>
+      </div>
+      <p style="font-size:12px;color:var(--ft-fg-3);margin:8px 0 0">Liste arborescente (Région > Département > CLPE) : la hiérarchie et le niveau (<code>H...</code> et <code>L...</code>) sont ajoutés automatiquement selon le niveau choisi. Renommez un niveau si besoin (ex. Territoire en CLPE). Autres cas, paramètres complémentaires : par exemple <code>HC_TERRITOIRE_ID=National&amp;LC_TERRITOIRE_ID=Territoire</code> pour préciser la hiérarchie et le niveau d'une dimension hiérarchique.</p>
+    </div>
+    <div class="card">
+      <h2>Accès au tableau de bord</h2>
+      <div class="form-grid">
+        <div class="field" style="grid-column:1/-1"><label for="pBase">Adresse du tableau de bord</label><input type="text" id="pBase" data-param="baseUrl"></div>
+        <div class="field"><label for="pDomain">domain</label><input type="text" id="pDomain" data-param="domain"></div>
+        <div class="field"><label for="pUser">user</label><input type="text" id="pUser" data-param="user"></div>
+        <div class="field"><label for="pPass">pass (compte public)</label><input type="text" id="pPass" data-param="pass" autocomplete="off"></div>
+      </div>
     </div>
     <div class="card">
       <h2>Sauvegarde</h2>
@@ -272,7 +269,6 @@ input[type=text],input[type=search],select{font:inherit;font-size:13px;padding:6
         <input type="file" id="fileBackup" accept=".json,application/json" hidden>
       </div>
     </div>
-    <div class="help">Cette page ne modifie rien en ligne : elle produit seulement le fichier à déposer dans le dépôt. Vos modifications sont conservées dans ce navigateur (brouillon) jusqu'à leur publication.</div>
   </section>
 </main>
 
@@ -341,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function showTab(name) {
     Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) { b.classList.toggle('active', b.getAttribute('data-tab') === name); });
     Array.prototype.forEach.call(document.querySelectorAll('[data-panel]'), function (s) { s.hidden = s.getAttribute('data-panel') !== name; });
-    if (name === 'export') renderKpis();
+    if (name === 'maj') renderKpis();
     window.scrollTo(0, 0);
   }
   $('tabs').addEventListener('click', function (e) { var b = e.target.closest('.tab'); if (b) showTab(b.getAttribute('data-tab')); });
@@ -407,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!pending) return;
     data = LD.merge(data, pending, { keepMissing: $('keepMissing').checked }).data;
     pending = null; $('repCard').hidden = true;
-    saveDraft(); renderAll(); showTab('pages'); toast('Import appliqué');
+    saveDraft(); renderAll(); toast('Import appliqué : publiez à l\'étape 3'); var pc = $('dlData'); if (pc) pc.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   $('cancelImport').addEventListener('click', function () { pending = null; $('repCard').hidden = true; });
 
@@ -431,7 +427,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var grp = (p.path[0] || 'Autres pages') + (p.path[1] ? ' > ' + p.path[1] : '');
       if (grp !== lastGrp) { h += '<tr class="grp"><td colspan="7">' + esc(grp) + '</td></tr>'; lastGrp = grp; }
       var fl = (p.filters || []).map(function (f, i) {
-        if (f.tree || f.geo) return '<div class="fitem"><span class="badge badge--off">' + esc(f.label) + ' : territoire</span><span class="n">' + 'gérée par le filtre Territoire (onglet 4)</span></div>';
+        if (f.tree || f.geo) return '<div class="fitem"><span class="badge badge--off">' + esc(f.label) + ' : territoire</span><span class="n">' + 'gérée par le filtre Territoire (plus bas)</span></div>';
         return '<div class="fitem"><input type="checkbox" data-pid="' + esc(p.id) + '" data-fi="' + i + '" data-ff="enabled"' + (f.enabled !== false ? ' checked' : '') + ' title="Proposer ce filtre">' +
           '<input type="text" data-pid="' + esc(p.id) + '" data-fi="' + i + '" data-ff="alias" value="' + esc(f.alias || '') + '" placeholder="' + esc(f.label) + '" title="' + esc(f.dim) + '">' +
           '<span class="n">' + f.values.length + ' val.</span>' + (f.check ? '<span class="badge badge--warn" title="Dimension déduite : ' + esc(f.dim) + '">à vérifier</span>' : '') +
@@ -558,13 +554,13 @@ document.addEventListener('DOMContentLoaded', function () {
             var mo = function (k) { return (d.mois || []).map(function (m) { return '<option value="' + m.k + '"' + (m.k === k ? ' selected' : '') + '>' + esc(m.l) + '</option>'; }).join(''); };
             return '<div style="margin-top:6px">Période ' + esc(d.nom) + ' : <select data-vi="' + i + '" data-vper="' + esc(d.dim) + '">' +
               [['fixe', 'Période capturée (' + d.texte + ')'], ['dernier', 'Dernier mois disponible'], ['dernierN1', 'Même mois, année précédente'], ['12m', '12 derniers mois'], ['12mN1', '13e au 24e mois'], ['mois', 'Un mois au choix'], ['plage', 'Une période au choix']]
-                .map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === cur ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>' +
+                .filter(function (o) { var S = {}, n = 0, L = -1e9; (d.mois || []).forEach(function (m) { if (!S[m.k]) { S[m.k] = 1; n++; } if (m.k > L) L = m.k; }); function all(a, z) { for (var k = a; k <= z; k++) if (!S[k]) return false; return true; } return o[0] === 'fixe' || (n > 0 && ({ dernier: true, dernierN1: !!S[L - 12], '12m': all(L - 11, L), '12mN1': all(L - 23, L - 12), mois: n > 1, plage: n > 1 })[o[0]]); }).map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === cur ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>' +
               (cur === 'mois' ? ' <select data-vi="' + i + '" data-vm1="' + esc(d.dim) + '">' + mo((p.keys || [])[0]) + '</select>' : '') +
               (cur === 'plage' ? ' du <select data-vi="' + i + '" data-vdeb="' + esc(d.dim) + '">' + mo(p.from) + '</select> au <select data-vi="' + i + '" data-vfin="' + esc(d.dim) + '">' + mo(p.to) + '</select>' : '') + '</div>';
           }).join('') + '</td>' +
           '<td><input type="checkbox" data-vi="' + i + '" data-vf="publique"' + (v.publique ? ' checked' : '') + '></td>' +
           '<td><div class="btn-row"><button class="btn btn--secondary btn--sm" type="button" data-vcopy="' + i + '">Copier le script</button>' +
-          '<a class="btn btn--sm" draggable="true" href="' + esc(LD_VIEWS.bookmarklet(v)) + '" title="Faites glisser ce bouton dans la barre de favoris">Favori : ' + esc(v.name) + '</a></div></td>' +
+          '<a class="btn btn--sm" draggable="true" href="' + esc(LD_VIEWS.bookmarklet(v)) + '" title="Faites glisser ce bouton dans la barre de favoris">🟡 ' + esc(v.name) + '</a></div></td>' +
           '<td><button class="btn btn--danger btn--sm" type="button" data-vdel="' + i + '">Suppr.</button></td></tr>';
       }).join('') + '</tbody></table></div>';
   }

@@ -465,7 +465,7 @@ document.addEventListener('DOMContentLoaded', function () {
         h += '<div class="flabel">Présentations prêtes à l\'emploi (facultatif)</div>' +
           '<p class="note" style="margin:0 0 8px">Faites glisser un bouton dans la barre de favoris de votre navigateur. Ouvrez ensuite la page avec le lien, puis cliquez sur le favori : le tableau se met en forme automatiquement.</p>' +
           vs.map(function (v) {
-            return '<div class="view-item"><a class="btn btn--secondary" draggable="true" href="' + esc(LD_VIEWS.bookmarklet(v)) + '" title="Faites glisser ce bouton dans la barre de favoris">' + ICO.grid + esc(v.name) + '</a>' +
+            return '<div class="view-item"><a class="btn btn--secondary" draggable="true" href="' + esc(LD_VIEWS.bookmarklet(v)) + '" title="Faites glisser ce bouton dans la barre de favoris">' + ICO.grid + '🟡 ' + esc(v.name) + '</a>' +
               (v.note ? '<span class="note" style="margin:0">' + esc(v.note) + '</span>' : '') + '</div>';
           }).join('');
       }
@@ -537,9 +537,9 @@ document.addEventListener('DOMContentLoaded', function () {
         '<ol class="do"><li>Affichez la <b>barre de favoris</b> de votre navigateur : appuyez en même temps sur <b>Ctrl + Maj + B</b>. Une barre apparaît sous la barre d\'adresse.</li>' +
         '<li>Cliquez sur le bouton jaune ci-dessous, <b>gardez le clic enfoncé</b>, faites-le glisser jusque dans cette barre, puis relâchez.</li></ol>' +
         '<div class="drag-demo">' + DEMO + '</div>' +
-        '<div style="text-align:center"><a class="bm-btn" draggable="true" href="' + esc(LD_VIEWS.captureBookmarklet(tpPages.map(function (t) { return { name: tpName(t), uid: t.uid }; }))) + '" title="Faites-moi glisser vers la barre de favoris">' + ICO.grid + 'Assistant TdB RPE</a></div>' +
+        '<div style="text-align:center"><a class="bm-btn" draggable="true" href="' + esc(LD_VIEWS.captureBookmarklet(tpPages.map(function (t) { return { name: tpName(t), uid: t.uid }; }))) + '" title="Faites-moi glisser vers la barre de favoris">' + ICO.grid + '🧭 Assistant TdB RPE</a></div>' +
         '<p class="sub" style="margin-top:14px">Conseillé : faites aussi glisser ce lien, pour ouvrir le tableau de bord en un clic depuis n\'importe quel onglet.</p>' +
-        '<div style="text-align:center"><a class="btn btn--secondary" draggable="true" href="' + esc(LD_VIEWS.homeUrl('')) + '" title="Faites-moi glisser vers la barre de favoris">' + ICO.open + 'Tableau de bord RPE</a></div>' +
+        '<div style="text-align:center"><a class="btn btn--secondary" draggable="true" href="' + esc(LD_VIEWS.homeUrl('')) + '" title="Faites-moi glisser vers la barre de favoris">' + ICO.open + '📊 Tableau de bord RPE</a></div>' +
         '<div class="tip">Le bouton ne réagit pas au clic, c\'est normal : il faut le <b>faire glisser</b>. S\'il refuse de se déposer, votre poste bloque peut-être ce type de favori : contactez l\'équipe qui gère cette page.</div>' +
         '<label class="check"><input type="checkbox" id="wzInst"' + (inst ? ' checked' : '') + '> Le bouton "Assistant TdB RPE" est dans ma barre de favoris</label>';
     } else if (wz.step === 2) {
