@@ -300,7 +300,7 @@ var LD_VIEW_APPLY = function (V) {
     await sleep(1500);
     /* 1. filtres du tableau de bord (lien) : remis seulement s'ils ont été effacés */
     var dashOk = true;
-    if (fsig(fsnap().map(fplain)) !== fsig(before.map(fplain))) dashOk = await frestore(before);
+    if (fsig(fsnap().map(fplain)) !== fsig(before.map(fplain))) { dashOk = await frestore(before); if (!dashOk) ko.push('filtres du lien'); }
     /* 2. filtres du tableau : ceux en place sont prioritaires, ceux de la capture complètent les autres dimensions */
     var dm = ed.chart.dmsel, list = tBefore.slice(), have = {}, ko = [];
     list.forEach(function (f) { have[f.dim && f.dim.id ? f.dim.id : f.dim] = 1; });
@@ -329,7 +329,7 @@ var LD_VIEW_APPLY = function (V) {
       var f0 = base ? tfFromJSON(dm, base) : null;
       if (f0 && f0.dim && Array.isArray(f0.dim.members)) { target = f0.dim; hl = { h: base.hierarchy, l: base.level }; }
       if (!target) list.forEach(function (f) { if (!target && f.dim && (f.dim.time || /^D_/.test(f.dim.id)) && Array.isArray(f.dim.members)) { target = f.dim; try { var jj = JSON.parse(JSON.stringify(f)); hl = { h: jj.hierarchy, l: jj.level }; } catch (e) { /* ignore */ } } });
-      if (!target) { var td = dmTimeDims(); if (td.length) target = td[0]; }
+      if (!target) { var td = dmTimeDims(); if (td.length) { target = td[0]; hl = target.hierarchies && target.hierarchies.length ? { h: 0, l: 0 } : { h: -1, l: -1 }; } }
       if (!target) { ko.push(pr.dim); return; }
       var byKey = {}, last = -Infinity;
       target.members.forEach(function (t) { if (typeof t !== 'number') return; var k = mkey(t); byKey[k] = t; if (k > last) last = k; });
@@ -342,8 +342,9 @@ var LD_VIEW_APPLY = function (V) {
       if (pr.mode === 'mois') (pr.keys || []).forEach(function (k) { if (byKey[k] !== undefined) sel.push(byKey[k]); });
       else for (var k = from; k <= to; k++) if (byKey[k] !== undefined) sel.push(byKey[k]);
       if (!sel.length) { ko.push((target.name || target.id) + ' : mois absent des données'); return; }
-      var f2 = tfFromJSON(dm, { dim: target.id, hierarchy: hl.h, level: hl.l, selectedMembers: sel, mode: 0 });
-      if (!f2) { ko.push(target.id); return; }
+      /* origIds : position des membres dans la dimension (indispensable à DigDash) */
+      var f2 = tfFromJSON(dm, { dim: target.id, hierarchy: hl.h, level: hl.l, origIds: sel.map(function (t) { return target.members.indexOf(t); }), selectedMembers: sel, mode: 0 });
+      if (!f2) { ko.push(target.id + ' : filtre refusé'); return; }
       try { if (f2.recalcIds) f2.recalcIds(); } catch (e) { /* ignore */ }
       list = list.filter(function (f) { return (f.dim && f.dim.id ? f.dim.id : f.dim) !== target.id; });
       list.push(f2); have[target.id] = 1;
@@ -357,8 +358,8 @@ var LD_VIEW_APPLY = function (V) {
         var ex = dm.dimensionsToExcludeForNavigation || (dm.dimensionsToExcludeForNavigation = {});
         Object.keys(tExcl).forEach(function (k) { ex[k] = tExcl[k]; });
         Object.keys(have).forEach(function (k) { ex[k] = true; });
-        try { ed.refreshDM(); } catch (e1) { try { ed.onDimFilterChange(); } catch (e2) { tabOk = false; } }
-      } catch (e) { tabOk = false; }
+        try { ed.refreshDM(); } catch (e1) { try { ed.onDimFilterChange(); } catch (e2) { tabOk = false; ko.push('rafraîchissement : ' + (e2 && e2.message || e2)); } }
+      } catch (e) { tabOk = false; ko.push('filtres du tableau : ' + (e && e.message || e)); }
     }
     await sleep(800);
     var txt = tfText(ed);
