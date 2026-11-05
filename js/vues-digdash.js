@@ -103,7 +103,14 @@ var LD_VIEW_CAPTURE = function (opt) {
       filtres: before.map(fplain),
       tfiltres: tfJSON(ed),
       tfiltresTexte: tfText(ed),
-      tdates: tfList(ed).filter(function (f) { return f.dim && (f.dim.time || /^D_/.test(f.dim.id)); }).map(function (f) { var t = ''; try { t = f.getFilterString(); } catch (e) { /* ignore */ } return { dim: f.dim.id, nom: f.dim.name, texte: t }; }),
+      tdates: tfList(ed).filter(function (f) { return f.dim && (f.dim.time || /^D_/.test(f.dim.id)); }).map(function (f) {
+        var t = '', j = {};
+        try { t = f.getFilterString(); } catch (e) { /* ignore */ }
+        try { j = JSON.parse(JSON.stringify(f)); } catch (e) { j = {}; }
+        function key(x) { var d = new Date(x * 1000); return d.getFullYear() * 12 + d.getMonth(); }
+        var mois = (f.dim.members || []).filter(function (x) { return typeof x === 'number'; }).map(function (x) { return { k: key(x), l: new Date(x * 1000).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) }; }).sort(function (a, b) { return b.k - a.k; });
+        return { dim: f.dim.id, nom: f.dim.name, texte: t, keys: (j.selectedMembers || []).filter(function (x) { return typeof x === 'number'; }).map(key), mois: mois };
+      }),
       vue: vue
     };
     var s = JSON.stringify(out);
@@ -120,29 +127,65 @@ var LD_VIEW_CAPTURE = function (opt) {
       '<label style="display:block;font-size:12px;color:#374151;margin-top:8px">Nom du favori</label>' +
       '<input data-ld="name" type="text" value="' + esc(out.dimensions.join(' x ').slice(0, 60)) + '" style="width:100%;box-sizing:border-box;font:inherit;padding:7px 8px;border:1px solid #D1D5DB;border-radius:4px;margin:4px 0 10px">' +
       out.tdates.map(function (d, i) {
-        return '<label style="display:block;font-size:12px;color:#374151">Période : ' + esc(d.nom) + '</label>' +
-          '<select data-ld="per" data-dim="' + esc(d.dim) + '" style="width:100%;box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid #D1D5DB;border-radius:4px;margin:4px 0 10px">' +
-          [['fixe', 'Mois fixe : ' + d.texte], ['dernier', 'Dernier mois disponible'], ['dernierN1', 'Même mois, année précédente'], ['12m', '12 derniers mois (cumul)'], ['12mN1', '12 mois précédents (13e au 24e mois, cumul)']]
-            .map(function (o) { return '<option value="' + o[0] + '">' + esc(o[1]) + '</option>'; }).join('') + '</select>';
+        var sel = 'box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid #D1D5DB;border-radius:4px;';
+        var opts = d.mois.map(function (m) { return '<option value="' + m.k + '">' + esc(m.l) + '</option>'; }).join('');
+        return '<div data-ld="perbox" data-i="' + i + '" style="margin-bottom:10px"><label style="display:block;font-size:12px;color:#374151">Période (' + esc(d.nom) + ')</label>' +
+          '<select data-ld="per" style="width:100%;' + sel + 'margin:4px 0">' +
+          [['fixe', 'Période capturée : ' + d.texte], ['dernier', 'Dernier mois disponible'], ['dernierN1', 'Même mois, année précédente'], ['12m', '12 derniers mois (cumul)'], ['12mN1', '13e au 24e mois (cumul)'], ['mois', 'Un mois au choix'], ['plage', 'Une période au choix']]
+            .map(function (o) { return '<option value="' + o[0] + '">' + esc(o[1]) + '</option>'; }).join('') + '</select>' +
+          '<div data-ld="permois" style="display:none"><select data-ld="m1" style="width:100%;' + sel + '">' + opts + '</select></div>' +
+          '<div data-ld="perplage" style="display:none;gap:6px"><select data-ld="pdeb" style="flex:1;' + sel + '" title="Début">' + opts + '</select><select data-ld="pfin" style="flex:1;' + sel + '" title="Fin">' + opts + '</select></div></div>';
       }).join('') +
       '<button type="button" data-ld="make" style="' + btn + 'background:#293378;color:#fff;border:1px solid #293378">Créer le favori</button> ' +
-      '<button type="button" data-ld="share" style="' + btn + 'background:#fff;color:#293378;border:1px solid #293378">Copier le code de partage</button>' +
       '<div data-ld="out" style="margin-top:10px"></div>');
     var zone = b.querySelector('[data-ld="out"]');
+    Array.prototype.forEach.call(b.querySelectorAll('[data-ld="perbox"]'), function (bx) {
+      var s0 = bx.querySelector('[data-ld="per"]');
+      var pd = bx.querySelector('[data-ld="pdeb"]'); if (pd && pd.options.length > 11) pd.selectedIndex = 11;
+      s0.onchange = function () {
+        bx.querySelector('[data-ld="permois"]').style.display = s0.value === 'mois' ? 'block' : 'none';
+        bx.querySelector('[data-ld="perplage"]').style.display = s0.value === 'plage' ? 'flex' : 'none';
+      };
+    });
+    /* nom proposé : période choisie en tête, puis les dimensions (tant que l'utilisateur n'a pas modifié le nom) */
+    var nameIn = b.querySelector('[data-ld="name"]'), nameEdited = false;
+    nameIn.oninput = function () { nameEdited = true; };
+    function perLabel(bx) {
+      var d = out.tdates[+bx.getAttribute('data-i')], m = bx.querySelector('[data-ld="per"]').value;
+      function lab(selName) { var x = bx.querySelector('[data-ld="' + selName + '"]'); return x && x.selectedIndex >= 0 ? x.options[x.selectedIndex].text : ''; }
+      if (m === 'fixe') return d.texte;
+      if (m === 'dernier') return 'Dernier mois';
+      if (m === 'dernierN1') return 'Même mois N-1';
+      if (m === '12m') return '12 derniers mois';
+      if (m === '12mN1') return '13e au 24e mois';
+      if (m === 'mois') return lab('m1');
+      if (m === 'plage') { var a = bx.querySelector('[data-ld="pdeb"]'), z = bx.querySelector('[data-ld="pfin"]'); var ia = a.selectedIndex, iz = z.selectedIndex; return (ia >= iz ? a.options[ia].text + ' à ' + z.options[iz].text : z.options[iz].text + ' à ' + a.options[ia].text); }
+      return '';
+    }
+    function defName() {
+      if (nameEdited) return;
+      var bx = b.querySelector('[data-ld="perbox"]'), base = out.dimensions.join(' x ');
+      nameIn.value = ((bx ? perLabel(bx) + ' - ' : '') + base).slice(0, 90);
+    }
+    Array.prototype.forEach.call(b.querySelectorAll('[data-ld="perbox"] select'), function (x) { x.addEventListener('change', defName); });
+    defName();
+    function periodes() {
+      return Array.prototype.map.call(b.querySelectorAll('[data-ld="perbox"]'), function (bx) {
+        var d = out.tdates[+bx.getAttribute('data-i')], m = bx.querySelector('[data-ld="per"]').value, p = { dim: d.dim, mode: m };
+        if (m === 'fixe') { p.mode = 'mois'; p.keys = d.keys; }
+        if (m === 'mois') { p.keys = [+bx.querySelector('[data-ld="m1"]').value]; }
+        if (m === 'plage') { var a = +bx.querySelector('[data-ld="pdeb"]').value, z = +bx.querySelector('[data-ld="pfin"]').value; p.from = Math.min(a, z); p.to = Math.max(a, z); }
+        return p;
+      });
+    }
     b.querySelector('[data-ld="make"]').onclick = function () {
       var name = b.querySelector('[data-ld="name"]').value.trim() || 'Ma présentation';
-      var periodes = Array.prototype.map.call(b.querySelectorAll('[data-ld="per"]'), function (sel) { return { dim: sel.getAttribute('data-dim'), mode: sel.value }; }).filter(function (x) { return x.mode !== 'fixe'; });
-      var V = { name: name, pageId: out.pageId, pageUid: out.pageUid, tfiltres: out.tfiltres, periodes: periodes, vue: out.vue };
+      var V = { name: name, pageId: out.pageId, pageUid: out.pageUid, tfiltres: out.tfiltres, periodes: periodes(), vue: out.vue };
       var href = 'javascript:' + encodeURIComponent('(' + opt.applySrc + ')(' + JSON.stringify(V) + ');');
       zone.innerHTML = '<p style="margin:0 0 6px">Faites glisser ce bouton dans votre <b>barre de favoris</b> :</p>' +
         '<a href="' + esc(href) + '" draggable="true" style="display:inline-block;background:#FFCC52;color:#0D1440;font-weight:bold;text-decoration:none;padding:7px 12px;border-radius:4px">' + esc(name) + '</a>' +
         '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Un clic sur ce favori, depuis n\'importe quelle page du tableau de bord, remettra le tableau dans cette présentation. Barre de favoris masquée : Ctrl+Maj+B.</p>';
       zone.querySelector('a').onclick = function (e) { e.preventDefault(); };
-    };
-    b.querySelector('[data-ld="share"]').onclick = function () {
-      function done(ok) { zone.innerHTML = '<p style="margin:0;color:' + (ok ? '#1B7F3B' : '#D92424') + '">' + (ok ? 'Code copié : envoyez-le à l\'administrateur de la page des liens pour qu\'il le publie.' : 'Copie impossible.') + '</p>'; }
-      if (navigator.clipboard && W.isSecureContext) navigator.clipboard.writeText(s).then(function () { done(true); }, function () { done(false); });
-      else { var ta = D.createElement('textarea'); ta.value = s; D.body.appendChild(ta); ta.select(); var ok = false; try { ok = D.execCommand('copy'); } catch (e) { ok = false; } ta.remove(); done(ok); }
     };
   })();
 };
@@ -261,35 +304,51 @@ var LD_VIEW_APPLY = function (V) {
     /* 2. filtres du tableau : ceux en place sont prioritaires, ceux de la capture complètent les autres dimensions */
     var dm = ed.chart.dmsel, list = tBefore.slice(), have = {}, ko = [];
     list.forEach(function (f) { have[f.dim && f.dim.id ? f.dim.id : f.dim] = 1; });
-    /* périodes relatives (dernier mois, N-1, 12 mois glissants...) calculées sur les mois disponibles au moment du clic : elles remplacent le filtre de date en place */
-    var perTxt = [];
-    (V.periodes || []).forEach(function (pr) {
-      var base = null;
+    /* périodes (dernier mois, N-1, 12 mois, mois ou période au choix) : calculées sur les mois disponibles au moment du clic,
+       appliquées à la dimension date du tableau affiché (son nom varie d'un tableau à l'autre) ; elles remplacent le filtre de date en place */
+    function mkey(t) { var d = new Date(t * 1000); return d.getFullYear() * 12 + d.getMonth(); }
+    function dmTimeDims() {
+      var r = [];
+      try {
+        var src = dm.dm || {};
+        Object.keys(src).forEach(function (k) {
+          var v = src[k], arr = Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).map(function (x) { return v[x]; }) : []);
+          arr.forEach(function (d) { if (d && d.time && d.id && Array.isArray(d.members) && r.indexOf(d) < 0) r.push(d); });
+        });
+      } catch (e) { /* ignore */ }
+      return r;
+    }
+    var pers = (V.periodes || []).slice(), pdims = {};
+    pers.forEach(function (p) { pdims[p.dim] = 1; });
+    (V.tfiltres || []).forEach(function (j) {
+      if (/^D_/.test(j.dim) && !pdims[j.dim]) { pers.push({ dim: j.dim, mode: 'mois', keys: (j.selectedMembers || []).filter(function (x) { return typeof x === 'number'; }).map(mkey) }); pdims[j.dim] = 1; }
+    });
+    pers.forEach(function (pr) {
+      var base = null, target = null, hl = { h: 0, l: 0 };
       (V.tfiltres || []).forEach(function (j) { if (j.dim === pr.dim) base = j; });
-      if (!base) return;
-      var f0 = tfFromJSON(dm, base);
-      var mem = f0 && f0.dim && f0.dim.members ? f0.dim.members.filter(function (x) { return typeof x === 'number'; }) : [];
-      if (!mem.length) { ko.push(pr.dim); return; }
-      function key(t) { var d = new Date(t * 1000); return d.getFullYear() * 12 + d.getMonth(); }
+      var f0 = base ? tfFromJSON(dm, base) : null;
+      if (f0 && f0.dim && Array.isArray(f0.dim.members)) { target = f0.dim; hl = { h: base.hierarchy, l: base.level }; }
+      if (!target) list.forEach(function (f) { if (!target && f.dim && (f.dim.time || /^D_/.test(f.dim.id)) && Array.isArray(f.dim.members)) { target = f.dim; try { var jj = JSON.parse(JSON.stringify(f)); hl = { h: jj.hierarchy, l: jj.level }; } catch (e) { /* ignore */ } } });
+      if (!target) { var td = dmTimeDims(); if (td.length) target = td[0]; }
+      if (!target) { ko.push(pr.dim); return; }
       var byKey = {}, last = -Infinity;
-      mem.forEach(function (t) { var k = key(t); byKey[k] = t; if (k > last) last = k; });
+      target.members.forEach(function (t) { if (typeof t !== 'number') return; var k = mkey(t); byKey[k] = t; if (k > last) last = k; });
       var from = last, to = last;
       if (pr.mode === 'dernierN1') { from = to = last - 12; }
       else if (pr.mode === '12m') { from = last - 11; }
       else if (pr.mode === '12mN1') { from = last - 23; to = last - 12; }
+      else if (pr.mode === 'plage') { from = pr.from; to = pr.to; }
       var sel = [];
-      for (var k = from; k <= to; k++) if (byKey[k] !== undefined) sel.push(byKey[k]);
-      if (!sel.length) { ko.push(pr.dim); return; }
-      var j2 = {}; Object.keys(base).forEach(function (x) { if (x !== 'origIds') j2[x] = base[x]; });
-      j2.selectedMembers = sel;
-      var f2 = tfFromJSON(dm, j2);
-      if (!f2) { ko.push(pr.dim); return; }
+      if (pr.mode === 'mois') (pr.keys || []).forEach(function (k) { if (byKey[k] !== undefined) sel.push(byKey[k]); });
+      else for (var k = from; k <= to; k++) if (byKey[k] !== undefined) sel.push(byKey[k]);
+      if (!sel.length) { ko.push((target.name || target.id) + ' : mois absent des données'); return; }
+      var f2 = tfFromJSON(dm, { dim: target.id, hierarchy: hl.h, level: hl.l, selectedMembers: sel, mode: 0 });
+      if (!f2) { ko.push(target.id); return; }
       try { if (f2.recalcIds) f2.recalcIds(); } catch (e) { /* ignore */ }
-      list = list.filter(function (f) { return (f.dim && f.dim.id ? f.dim.id : f.dim) !== pr.dim; });
-      list.push(f2); have[pr.dim] = 1;
-      perTxt.push(sel.length + ' mois');
+      list = list.filter(function (f) { return (f.dim && f.dim.id ? f.dim.id : f.dim) !== target.id; });
+      list.push(f2); have[target.id] = 1;
     });
-    (V.tfiltres || []).forEach(function (j) { if (have[j.dim]) return; var f = tfFromJSON(dm, j); if (f) { list.push(f); have[j.dim] = 1; } else ko.push(j.dim); });
+    (V.tfiltres || []).forEach(function (j) { if (have[j.dim] || pdims[j.dim]) return; var f = tfFromJSON(dm, j); if (f) { list.push(f); have[j.dim] = 1; } else ko.push(j.dim); });
     var tabOk = true;
     if (list.length) {
       try {
