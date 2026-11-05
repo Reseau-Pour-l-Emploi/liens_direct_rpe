@@ -538,7 +538,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var name = $('vName').value.trim();
     if (!name) { toast('Donnez un nom à la présentation'); $('vName').focus(); return; }
     data.views = data.views || [];
-    data.views.push({ id: 'v' + Date.now().toString(36), name: name, note: $('vNote').value.trim(), pageId: c.pageId, pageUid: c.pageUid, portlet: c.portlet, dimensions: c.dimensions || [], mesures: c.mesures || [], filtres: c.filtres || [], publique: false, capturedAt: c.capturedAt, vue: c.vue });
+    data.views.push({ id: 'v' + Date.now().toString(36), name: name, note: $('vNote').value.trim(), pageId: c.pageId, pageUid: c.pageUid, portlet: c.portlet, dimensions: c.dimensions || [], mesures: c.mesures || [], filtres: c.filtres || [], tfiltres: c.tfiltres || [], tfiltresTexte: c.tfiltresTexte || [], tdates: c.tdates || [], periodes: [], publique: false, capturedAt: c.capturedAt, vue: c.vue });
     $('vCapture').value = ''; $('vName').value = ''; $('vNote').value = '';
     saveDraft(); renderViews(); toast('Présentation ajoutée');
   });
@@ -551,7 +551,13 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<tr><td><input type="text" data-vi="' + i + '" data-vf="name" value="' + esc(v.name) + '"></td>' +
           '<td><input type="text" data-vi="' + i + '" data-vf="note" value="' + esc(v.note || '') + '"></td>' +
           '<td>' + esc(p ? (p.path.slice(1).join(' > ') + ' > ' + LD.displayTitle(p)) : v.pageId) + (p ? '' : ' <span class="badge badge--warn">page absente</span>') + '</td>' +
-          '<td class="pid">' + esc((v.dimensions || []).join(' x ')) + '<br>' + esc((v.mesures || []).join(', ')) + '</td>' +
+          '<td class="pid">' + esc((v.dimensions || []).join(' x ')) + '<br>' + esc((v.mesures || []).join(', ')) + ((v.tfiltresTexte || []).length ? '<br>Filtres : ' + esc(v.tfiltresTexte.join(', ')) : '') +
+          (v.tdates || []).map(function (d) {
+            var cur = ((v.periodes || []).filter(function (x) { return x.dim === d.dim; })[0] || { mode: 'fixe' }).mode;
+            return '<div style="margin-top:6px">Période ' + esc(d.nom) + ' : <select data-vi="' + i + '" data-vper="' + esc(d.dim) + '">' +
+              [['fixe', 'Mois fixe (' + d.texte + ')'], ['dernier', 'Dernier mois disponible'], ['dernierN1', 'Même mois, année précédente'], ['12m', '12 derniers mois'], ['12mN1', '13e au 24e mois']]
+                .map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === cur ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></div>';
+          }).join('') + '</td>' +
           '<td><input type="checkbox" data-vi="' + i + '" data-vf="publique"' + (v.publique ? ' checked' : '') + '></td>' +
           '<td><div class="btn-row"><button class="btn btn--secondary btn--sm" type="button" data-vcopy="' + i + '">Copier le script</button>' +
           '<a class="btn btn--sm" draggable="true" href="' + esc(LD_VIEWS.bookmarklet(v)) + '" title="Faites glisser ce bouton dans la barre de favoris">Favori : ' + esc(v.name) + '</a></div></td>' +
@@ -562,6 +568,12 @@ document.addEventListener('DOMContentLoaded', function () {
     var t = e.target;
     if (!t.hasAttribute('data-vi')) return;
     var v = data.views[+t.getAttribute('data-vi')];
+    if (t.hasAttribute('data-vper')) {
+      var dimP = t.getAttribute('data-vper');
+      v.periodes = (v.periodes || []).filter(function (x) { return x.dim !== dimP; });
+      if (t.value !== 'fixe') v.periodes.push({ dim: dimP, mode: t.value });
+      saveDraft(); renderViews(); return;
+    }
     v[t.getAttribute('data-vf')] = t.type === 'checkbox' ? t.checked : t.value.trim();
     saveDraft();
     if (t.getAttribute('data-vf') === 'name') renderViews();
