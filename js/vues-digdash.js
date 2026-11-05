@@ -141,10 +141,10 @@ var LD_VIEW_CAPTURE = function (opt) {
       out.tdates.map(function (d, i) {
         var sel = 'box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid #D1D5DB;border-radius:4px;';
         var opts = d.mois.map(function (m) { return '<option value="' + m.k + '">' + esc(m.l) + '</option>'; }).join('');
-        return '<div data-ld="perbox" data-i="' + i + '" style="margin-bottom:10px"><label style="display:block;font-size:12px;color:#374151">Période (' + esc(d.nom) + ')</label>' +
+        return '<div data-ld="perbox" data-i="' + i + '" style="margin-bottom:10px"><label style="display:block;font-size:12px;color:#374151">Période (' + esc(d.nom) + ') : ' + d.mois.length + ' mois disponible' + (d.mois.length > 1 ? 's' : '') + '</label>' +
           '<select data-ld="per" style="width:100%;' + sel + 'margin:4px 0">' +
           [['fixe', 'Période capturée : ' + d.texte], ['dernier', 'Dernier mois disponible'], ['dernierN1', 'Même mois, année précédente'], ['12m', '12 derniers mois (cumul)'], ['12mN1', '13e au 24e mois (cumul)'], ['mois', 'Un mois au choix'], ['plage', 'Une période au choix']]
-            .map(function (o) { return '<option value="' + o[0] + '">' + esc(o[1]) + '</option>'; }).join('') + '</select>' +
+            .filter(function (o) { var S = {}, n = 0, L = -1e9; (d.mois || []).forEach(function (m) { if (!S[m.k]) { S[m.k] = 1; n++; } if (m.k > L) L = m.k; }); function all(a, z) { for (var k = a; k <= z; k++) if (!S[k]) return false; return true; } return o[0] === 'fixe' || (n > 0 && ({ dernier: true, dernierN1: !!S[L - 12], '12m': all(L - 11, L), '12mN1': all(L - 23, L - 12), mois: n > 1, plage: n > 1 })[o[0]]); }).map(function (o) { return '<option value="' + o[0] + '">' + esc(o[1]) + '</option>'; }).join('') + '</select>' +
           '<div data-ld="permois" style="display:none"><select data-ld="m1" style="width:100%;' + sel + '">' + opts + '</select></div>' +
           '<div data-ld="perplage" style="display:none;gap:6px"><select data-ld="pdeb" style="flex:1;' + sel + '" title="Début">' + opts + '</select><select data-ld="pfin" style="flex:1;' + sel + '" title="Fin">' + opts + '</select></div></div>';
       }).join('') +
@@ -207,7 +207,7 @@ var LD_VIEW_CAPTURE = function (opt) {
       var href = 'javascript:' + encodeURIComponent('(' + opt.applySrc + ')(' + JSON.stringify(V) + ');');
       zone.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-weight:bold"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:#1B7F3B;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px">' + (nstep + 1) + '</span>Rangez-le dans vos favoris</div>' +
         '<p style="margin:0 0 8px">Cliquez sur le bouton jaune, gardez le clic enfoncé et <b>faites-le glisser tout en haut de la fenêtre</b>, dans la barre de favoris, puis relâchez.</p>' +
-        '<div style="text-align:center"><a href="' + esc(href) + '" draggable="true" title="Faites-moi glisser vers la barre de favoris" style="display:inline-block;background:#FFCC52;color:#0D1440;font-weight:bold;text-decoration:none;padding:9px 14px;border-radius:4px;box-shadow:0 0 0 4px rgba(255,204,82,.35);cursor:grab">&#9733; ' + esc(name) + '</a></div>' +
+        '<div style="text-align:center"><a href="' + esc(href) + '" draggable="true" title="Faites-moi glisser vers la barre de favoris" style="display:inline-block;background:#FFCC52;color:#0D1440;font-weight:bold;text-decoration:none;padding:9px 14px;border-radius:4px;box-shadow:0 0 0 4px rgba(255,204,82,.35);cursor:grab">🟡 ' + esc(name) + '</a></div>' +
         '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Vous ne voyez pas la barre de favoris ? Appuyez sur Ctrl+Maj+B. Ensuite, un clic sur ce favori, depuis n\'importe quelle page du tableau de bord, remettra le tableau dans cette présentation.</p>';
       zone.querySelector('a').onclick = function (e) { e.preventDefault(); };
     };
@@ -226,8 +226,8 @@ var LD_VIEW_CAPTURE = function (opt) {
       o.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(13,20,64,.45);display:flex;align-items:center;justify-content:center;font:14px Arial,sans-serif';
       o.innerHTML = '<div style="background:#fff;color:#0D1440;max-width:420px;width:calc(100% - 32px);border-top:5px solid #FFCC52;border-radius:10px;padding:20px;box-shadow:0 8px 28px rgba(0,0,0,.3);line-height:1.5">' +
         '<div style="font-weight:bold;font-size:16px;margin-bottom:8px">' + (inDD ? 'Tableau de bord en cours de chargement' : 'Ouverture du tableau de bord RPE') + '</div>' +
-        (inDD ? '<p style="margin:0 0 14px">Attendez la fin du chargement, puis <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">&#9733; ' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</p>'
-          : '<p style="margin:0 0 6px">Le tableau de bord s\'ouvre dans <b data-n="1">3</b> s.</p><ol style="margin:0 0 14px;padding-left:20px"><li>Une fois la page chargée, <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">&#9733; ' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</li></ol>') +
+        (inDD ? '<p style="margin:0 0 14px">Attendez la fin du chargement, puis <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</p>'
+          : '<p style="margin:0 0 6px">Le tableau de bord s\'ouvre dans <b data-n="1">3</b> s.</p><ol style="margin:0 0 14px;padding-left:20px"><li>Une fois la page chargée, <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</li></ol>') +
         '<div style="display:flex;gap:8px;justify-content:flex-end">' + (inDD ? '' : '<button data-x="1" style="font:inherit;font-weight:bold;padding:8px 12px;border-radius:4px;border:1px solid #293378;background:#fff;color:#293378;cursor:pointer">Annuler</button>') +
         '<button data-ok="1" style="font:inherit;font-weight:bold;padding:8px 12px;border-radius:4px;border:1px solid #293378;background:#293378;color:#fff;cursor:pointer">' + (inDD ? 'Compris' : 'Ouvrir maintenant') + '</button></div></div>';
       (D.body || D.documentElement).appendChild(o);
@@ -235,7 +235,7 @@ var LD_VIEW_CAPTURE = function (opt) {
       o.querySelector('[data-ok]').onclick = function () { clearInterval(tm); o.remove(); if (!inDD) location.href = url; };
       var x = o.querySelector('[data-x]'); if (x) x.onclick = function () { clearInterval(tm); o.remove(); };
     }
-    if (!W.ddCtrl && opt.home) { goDD(opt.home, 'Assistant TdB RPE'); return; }
+    if (!W.ddCtrl && opt.home) { goDD(opt.home, '🧭 Assistant TdB RPE'); return; }
     if (!W.ddCtrl) { alertBox('Ouvrez d\'abord le tableau de bord RPE, puis cliquez de nouveau sur le favori "Assistant TdB RPE".'); return; }
     function alertBox(msg) { var a = D.createElement('div'); a.style.cssText = 'position:fixed;z-index:999999;right:16px;bottom:16px;max-width:360px;background:#D92424;color:#fff;padding:12px 16px;border-radius:8px;font:13px Arial,sans-serif'; a.textContent = msg; D.body.appendChild(a); setTimeout(function () { a.remove(); }, 6000); }
     var old = D.getElementById('ldGuide'); if (old) old.remove();
@@ -359,8 +359,8 @@ var LD_VIEW_APPLY = function (V) {
       o.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(13,20,64,.45);display:flex;align-items:center;justify-content:center;font:14px Arial,sans-serif';
       o.innerHTML = '<div style="background:#fff;color:#0D1440;max-width:420px;width:calc(100% - 32px);border-top:5px solid #FFCC52;border-radius:10px;padding:20px;box-shadow:0 8px 28px rgba(0,0,0,.3);line-height:1.5">' +
         '<div style="font-weight:bold;font-size:16px;margin-bottom:8px">' + (inDD ? 'Tableau de bord en cours de chargement' : 'Ouverture du tableau de bord RPE') + '</div>' +
-        (inDD ? '<p style="margin:0 0 14px">Attendez la fin du chargement, puis <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">&#9733; ' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</p>'
-          : '<p style="margin:0 0 6px">Le tableau de bord s\'ouvre dans <b data-n="1">3</b> s.</p><ol style="margin:0 0 14px;padding-left:20px"><li>Une fois la page chargée, <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">&#9733; ' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</li></ol>') +
+        (inDD ? '<p style="margin:0 0 14px">Attendez la fin du chargement, puis <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</p>'
+          : '<p style="margin:0 0 6px">Le tableau de bord s\'ouvre dans <b data-n="1">3</b> s.</p><ol style="margin:0 0 14px;padding-left:20px"><li>Une fois la page chargée, <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</li></ol>') +
         '<div style="display:flex;gap:8px;justify-content:flex-end">' + (inDD ? '' : '<button data-x="1" style="font:inherit;font-weight:bold;padding:8px 12px;border-radius:4px;border:1px solid #293378;background:#fff;color:#293378;cursor:pointer">Annuler</button>') +
         '<button data-ok="1" style="font:inherit;font-weight:bold;padding:8px 12px;border-radius:4px;border:1px solid #293378;background:#293378;color:#fff;cursor:pointer">' + (inDD ? 'Compris' : 'Ouvrir maintenant') + '</button></div></div>';
       (D.body || D.documentElement).appendChild(o);
@@ -368,7 +368,7 @@ var LD_VIEW_APPLY = function (V) {
       o.querySelector('[data-ok]').onclick = function () { clearInterval(tm); o.remove(); if (!inDD) location.href = url; };
       var x = o.querySelector('[data-x]'); if (x) x.onclick = function () { clearInterval(tm); o.remove(); };
     }
-    if (!W.ddCtrl && V.url) { goDD(V.url, V.name); return; }
+    if (!W.ddCtrl && V.url) { goDD(V.url, '🟡 ' + V.name); return; }
     if (!W.ddCtrl || !W.AxisEditor) { toast('Ouvrez d\'abord le tableau de bord RPE, puis relancez la présentation.', false); return; }
     function toolbar() {
       return Array.prototype.filter.call(D.querySelectorAll('.editToolbar'), function (tb) {
