@@ -3,13 +3,25 @@
    LD_VIEW_APPLY   : réapplique une mise en forme enregistrée (script console ou favori)
    Les deux s'appuient sur l'éditeur interne de DigDash (AxisEditor.getCurrentViewJSON / applyViewJSON). */
 
-var LD_VIEW_CAPTURE = function () {
+var LD_VIEW_CAPTURE = function (opt) {
+  opt = opt || {};
   (async function () {
     var D = document, W = window, cap = { ed: null, dh: null };
+    /* message : console (admin) ou panneau à l'écran (favori utilisateur) */
+    function panel(html) {
+      var b = D.getElementById('ldVuePanel') || D.createElement('div');
+      b.id = 'ldVuePanel';
+      b.style.cssText = 'position:fixed;z-index:999999;right:16px;bottom:16px;width:380px;max-width:calc(100vw - 32px);background:#fff;color:#0D1440;border:1px solid #E5E7EB;border-top:4px solid #293378;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font:13px Arial,sans-serif;padding:14px 16px;line-height:1.45';
+      b.innerHTML = html + '<button type="button" data-ld="close" style="position:absolute;top:6px;right:8px;border:0;background:none;font-size:18px;cursor:pointer;color:#6B7280" title="Fermer">&times;</button>';
+      D.body.appendChild(b);
+      b.querySelector('[data-ld="close"]').onclick = function () { b.remove(); };
+      return b;
+    }
+    function fail(msg) { if (opt.ui) panel('<b>Capture impossible</b><p style="margin:6px 0 0">' + msg + '</p>'); else console.log(msg); }
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     function vis(e) { return !!(e && (e.offsetWidth || e.offsetHeight)); }
     var tb = Array.prototype.filter.call(D.querySelectorAll('.editToolbar'), vis)[0];
-    if (!tb) { console.log('Aucun Tableau personnalisé visible : ouvrez la page et mettez le tableau en forme'); return; }
+    if (!tb) { fail('Aucun Tableau personnalisé visible : ouvrez une page Tableau personnalisé et mettez le tableau en forme.'); return; }
     var fid = tb.id.replace(/_editToolbar$/, ''), frame = D.getElementById(fid), src = tb.querySelector('.editTool.drag');
     var page = tb.closest('.dashboard_page[role="main"]');
     var saved = [];
@@ -33,8 +45,16 @@ var LD_VIEW_CAPTURE = function () {
       D.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
       D.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
-    var ed = cap.ed;
-    if (!ed) { console.log('Éditeur du tableau introuvable'); return; }
+    function findEd(o, d, seen) {
+      if (!o || typeof o !== 'object' || d > 3 || seen.indexOf(o) >= 0) return null;
+      seen.push(o);
+      if (o instanceof W.AxisEditor) return o;
+      var ks = Object.keys(o);
+      for (var i = 0; i < ks.length && i < 300; i++) { try { var x = findEd(o[ks[i]], d + 1, seen); if (x) return x; } catch (e) { /* ignore */ } }
+      return null;
+    }
+    var ed = cap.ed || (cap.dh ? findEd(cap.dh, 0, []) : null);
+    if (!ed) { fail('Éditeur du tableau introuvable : la version de DigDash a peut-être changé.'); return; }
     var v = ed.getCurrentViewJSON();
     var vue = typeof v === 'string' ? JSON.parse(v) : v;
     function titles(sel) { return Array.prototype.map.call(tb.querySelectorAll(sel), function (x) { return x.getAttribute('title'); }); }
@@ -49,8 +69,36 @@ var LD_VIEW_CAPTURE = function () {
       vue: vue
     };
     var s = JSON.stringify(out);
-    console.log('Présentation capturée : ' + out.dimensions.join(' x ') + ' | ' + out.mesures.join(', ') + ' (' + s.length + ' caractères)');
-    try { copy(s); console.log('Résultat copié dans le presse-papier : collez-le dans l\'admin, onglet Présentations'); } catch (e) { console.log(s); }
+    var resume = out.dimensions.join(' x ') + (out.mesures.length ? ' | ' + out.mesures.join(', ') : '');
+    if (!opt.ui) {
+      console.log('Présentation capturée : ' + resume + ' (' + s.length + ' caractères)');
+      try { copy(s); console.log('Résultat copié dans le presse-papier : collez-le dans l\'admin, onglet Présentations'); } catch (e) { console.log(s); }
+      return;
+    }
+    function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    var btn = 'font:inherit;font-weight:bold;border-radius:4px;padding:7px 12px;cursor:pointer;';
+    var b = panel('<b style="font-size:14px">Présentation capturée</b>' +
+      '<p style="margin:6px 0;color:#374151">' + esc(resume) + '</p>' +
+      '<label style="display:block;font-size:12px;color:#374151;margin-top:8px">Nom du favori</label>' +
+      '<input data-ld="name" type="text" value="' + esc(out.dimensions.join(' x ').slice(0, 60)) + '" style="width:100%;box-sizing:border-box;font:inherit;padding:7px 8px;border:1px solid #D1D5DB;border-radius:4px;margin:4px 0 10px">' +
+      '<button type="button" data-ld="make" style="' + btn + 'background:#293378;color:#fff;border:1px solid #293378">Créer le favori</button> ' +
+      '<button type="button" data-ld="share" style="' + btn + 'background:#fff;color:#293378;border:1px solid #293378">Copier le code de partage</button>' +
+      '<div data-ld="out" style="margin-top:10px"></div>');
+    var zone = b.querySelector('[data-ld="out"]');
+    b.querySelector('[data-ld="make"]').onclick = function () {
+      var name = b.querySelector('[data-ld="name"]').value.trim() || 'Ma présentation';
+      var V = { name: name, pageId: out.pageId, pageUid: out.pageUid, vue: out.vue };
+      var href = 'javascript:' + encodeURIComponent('(' + opt.applySrc + ')(' + JSON.stringify(V) + ');');
+      zone.innerHTML = '<p style="margin:0 0 6px">Faites glisser ce bouton dans votre <b>barre de favoris</b> :</p>' +
+        '<a href="' + esc(href) + '" draggable="true" style="display:inline-block;background:#FFCC52;color:#0D1440;font-weight:bold;text-decoration:none;padding:7px 12px;border-radius:4px">' + esc(name) + '</a>' +
+        '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Un clic sur ce favori, depuis n\'importe quelle page du tableau de bord, remettra le tableau dans cette présentation. Barre de favoris masquée : Ctrl+Maj+B.</p>';
+      zone.querySelector('a').onclick = function (e) { e.preventDefault(); };
+    };
+    b.querySelector('[data-ld="share"]').onclick = function () {
+      function done(ok) { zone.innerHTML = '<p style="margin:0;color:' + (ok ? '#1B7F3B' : '#D92424') + '">' + (ok ? 'Code copié : envoyez-le à l\'administrateur de la page des liens pour qu\'il le publie.' : 'Copie impossible.') + '</p>'; }
+      if (navigator.clipboard && W.isSecureContext) navigator.clipboard.writeText(s).then(function () { done(true); }, function () { done(false); });
+      else { var ta = D.createElement('textarea'); ta.value = s; D.body.appendChild(ta); ta.select(); var ok = false; try { ok = D.execCommand('copy'); } catch (e) { ok = false; } ta.remove(); done(ok); }
+    };
   })();
 };
 
@@ -108,8 +156,17 @@ var LD_VIEW_APPLY = function (V) {
       D.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
       D.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
-    if (!cap.ed) { toast('Éditeur du tableau introuvable : la version de DigDash a peut-être changé.', false); return; }
-    try { cap.ed.applyViewJSON(V.vue); toast('Présentation "' + V.name + '" appliquée.', true); }
+    function findEd(o, d, seen) {
+      if (!o || typeof o !== 'object' || d > 3 || seen.indexOf(o) >= 0) return null;
+      seen.push(o);
+      if (o instanceof W.AxisEditor) return o;
+      var ks = Object.keys(o);
+      for (var i = 0; i < ks.length && i < 300; i++) { try { var x = findEd(o[ks[i]], d + 1, seen); if (x) return x; } catch (e) { /* ignore */ } }
+      return null;
+    }
+    var ed = cap.ed || (cap.dh ? findEd(cap.dh, 0, []) : null);
+    if (!ed) { toast('Éditeur du tableau introuvable : la version de DigDash a peut-être changé.', false); return; }
+    try { ed.applyViewJSON(V.vue); toast('Présentation "' + V.name + '" appliquée.', true); }
     catch (e) { toast('Échec de l\'application : ' + (e && e.message || e), false); }
   })();
 };
@@ -117,12 +174,18 @@ var LD_VIEW_APPLY = function (V) {
 /* Construction des scripts à partir d'une présentation enregistrée */
 var LD_VIEWS = {
   captureScript: function () { return '(' + LD_VIEW_CAPTURE.toString() + ')();'; },
+  minify: function (code) { return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n\s*/g, ' '); },
+  /* favori "Capturer une présentation" : utilisable par tout utilisateur, sans console */
+  captureBookmarklet: function () {
+    var code = '(' + LD_VIEW_CAPTURE.toString() + ')(' + JSON.stringify({ ui: true, applySrc: LD_VIEWS.minify(LD_VIEW_APPLY.toString()) }) + ');';
+    return 'javascript:' + encodeURIComponent(LD_VIEWS.minify(code));
+  },
   applyScript: function (view) {
     var V = { name: view.name, pageId: view.pageId, pageUid: view.pageUid, vue: view.vue };
     return '(' + LD_VIEW_APPLY.toString() + ')(' + JSON.stringify(V) + ');';
   },
   bookmarklet: function (view) {
-    var code = LD_VIEWS.applyScript(view).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n\s*/g, ' ');
+    var code = LD_VIEWS.minify(LD_VIEWS.applyScript(view));
     return 'javascript:' + encodeURIComponent(code);
   }
 };
