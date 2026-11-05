@@ -153,7 +153,13 @@ var LD_VIEW_CAPTURE = function (opt) {
     function perLabel(bx) {
       var d = out.tdates[+bx.getAttribute('data-i')], m = bx.querySelector('[data-ld="per"]').value;
       function lab(selName) { var x = bx.querySelector('[data-ld="' + selName + '"]'); return x && x.selectedIndex >= 0 ? x.options[x.selectedIndex].text : ''; }
-      if (m === 'fixe') return d.texte;
+      if (m === 'fixe') {
+        var ks = (d.keys || []).slice().sort(function (x, y) { return x - y; });
+        var ml = function (k) { var r = ''; (d.mois || []).forEach(function (o) { if (o.k === k) r = o.l; }); return r; };
+        if (ks.length === 1 && ml(ks[0])) return ml(ks[0]);
+        if (ks.length > 1 && ml(ks[0]) && ml(ks[ks.length - 1])) return ml(ks[0]) + ' à ' + ml(ks[ks.length - 1]);
+        return d.texte;
+      }
       if (m === 'dernier') return 'Dernier mois';
       if (m === 'dernierN1') return 'Même mois N-1';
       if (m === '12m') return '12 derniers mois';
@@ -265,11 +271,31 @@ var LD_VIEW_APPLY = function (V) {
     function tfList(ed) { try { return (ed.chart.dmsel.dimsToFilter || []).slice(); } catch (e) { return []; } }
     function tfJSON(ed) { return tfList(ed).map(function (f) { try { return JSON.parse(JSON.stringify(f)); } catch (e) { return null; } }).filter(Boolean); }
     function tfText(ed) { return tfList(ed).map(function (f) { var n = f.dim && f.dim.name ? f.dim.name : ''; var t = ''; try { t = f.getFilterString(); } catch (e) { /* ignore */ } return (n ? n + ' : ' : '') + t; }); }
+    /* reconstruction d'un filtre comme le fait DigDash : new FilterSelection(dimension, hiérarchie, niveau, positions, membres...)
+       les positions (origIds) sont recalculées à chaque fois, car l'ordre interne des membres peut changer d'une session à l'autre */
+    function tfDim(dm, id) {
+      var d = dm && dm.availableDim ? dm.availableDim[id] : null;
+      if (d && typeof d === 'object') return d;
+      try {
+        var src = dm.dm || {}, found = null;
+        Object.keys(src).forEach(function (k) {
+          var v = src[k], arr = Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).map(function (x) { return v[x]; }) : []);
+          arr.forEach(function (x) { if (!found && x && x.id === id && Array.isArray(x.members)) found = x; });
+        });
+        return found;
+      } catch (e) { return null; }
+    }
     function tfFromJSON(dm, j) {
-      var f = null;
-      try { if (dm.castFilterSelection) f = dm.castFilterSelection(j); } catch (e) { f = null; }
-      if (!f || !f.getFilterString) { try { var x = new W.DataModelSelectionFromJSON({ dimsToFilter: [j] }, dm.dm); f = x.dmsel && x.dmsel.dimsToFilter ? x.dmsel.dimsToFilter[0] : null; } catch (e) { f = null; } }
-      return f && f.getFilterString ? f : null;
+      var FS = W.FilterSelection, dim = tfDim(dm, j.dim);
+      if (!FS || !dim || !Array.isArray(dim.members)) return null;
+      var mem = (j.selectedMembers || []).filter(function (m) { return dim.members.indexOf(m) >= 0; });
+      if (!mem.length) return null;
+      var h = j.hierarchy == null ? -1 : j.hierarchy, l = j.level == null ? -1 : j.level, oids = null;
+      if (l !== -1 && typeof W.getMemberPos === 'function') { try { oids = W.getMemberPos(dim, h, l, mem); } catch (e) { oids = null; } }
+      if (l === -1 || !oids || !oids.length) { l = -1; oids = mem.map(function (m) { return dim.members.indexOf(m); }); }
+      var f = new FS(dim, h, l, oids, mem.slice(), undefined, j.mode || 0, j.displayValue);
+      try { f.recalcIds(); } catch (e) { /* ignore */ }
+      return f;
     }
     var before = fsnap();
     wrap(W.AxisEditor, 'ed'); wrap(W.DragEditHandler, 'dh');
@@ -352,14 +378,8 @@ var LD_VIEW_APPLY = function (V) {
       else for (var k = from; k <= to; k++) if (byKey[k] !== undefined) sel.push(byKey[k]);
       if (!sel.length) { ko.push((target.name || target.id) + ' : mois absent des données'); return; }
       /* origIds : position des membres dans la dimension (indispensable à DigDash) */
-      var oids = sel.map(function (t) { return target.members.indexOf(t); });
-      var variants = [
-        { dim: target.id, hierarchy: hl.h, level: hl.l, origIds: oids, selectedMembers: sel, mode: 0 },
-        { dim: target.id, hierarchy: hl.h, level: hl.l, selectedMembers: sel, mode: 0 },
-        { dim: target.id, hierarchy: -1, level: -1, origIds: oids, selectedMembers: sel, mode: 0 }
-      ];
-      var f2 = null;
-      variants.some(function (v) { var f = tfFromJSON(dm, v); if (f) { f.__alts = variants; f2 = f; } return !!f; });
+      /* niveau -1 : membres bruts, comme les filtres de date posés par la popup */
+      var f2 = tfFromJSON(dm, { dim: target.id, hierarchy: target.hierarchies && target.hierarchies.length ? 0 : -1, level: -1, selectedMembers: sel, mode: 0 });
       if (!f2) { ko.push(target.id + ' : filtre refusé'); return; }
       list = list.filter(function (f) { return (f.dim && f.dim.id ? f.dim.id : f.dim) !== target.id; });
       list.push(f2); have[target.id] = 1;
@@ -371,12 +391,10 @@ var LD_VIEW_APPLY = function (V) {
         dm.removeFilters();
         list.forEach(function (f) {
           var done = false, err = null;
-          var cands = [f].concat((f.__alts || []).map(function (v) { return tfFromJSON(dm, v); }).filter(Boolean));
-          cands.forEach(function (c) {
-            if (done) return;
-            try { dm.setFilter(c.clone ? c.clone() : c); c.getFilterString(); done = true; }
-            catch (e) { err = e; try { dm.removeFilterByDimension(c.dim); } catch (e2) { /* ignore */ } }
-          });
+          try {
+            if (dm.setFilter(f.clone ? f.clone() : f) === false) err = 'dimension absente de ce tableau';
+            else { f.getFilterString(); done = true; }
+          } catch (e) { err = e; try { dm.removeFilterByDimension(f.dim); } catch (e2) { /* ignore */ } }
           if (!done) ko.push((f.dim && (f.dim.name || f.dim.id)) + ' : ' + (err && err.message || err));
         });
         var ex = dm.dimensionsToExcludeForNavigation || (dm.dimensionsToExcludeForNavigation = {});
