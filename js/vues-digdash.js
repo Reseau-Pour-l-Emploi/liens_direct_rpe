@@ -5,7 +5,7 @@
 
 var LD_VIEW_CAPTURE = function (opt) {
   opt = opt || {};
-  (async function () {
+  var run = async function () {
     var D = document, W = window, cap = { ed: null, dh: null };
     /* message : console (admin) ou panneau à l'écran (favori utilisateur) */
     function panel(html) {
@@ -26,7 +26,7 @@ var LD_VIEW_CAPTURE = function (opt) {
         var pb = panel('<b style="font-size:14px">Ouvrez d\'abord un tableau personnalisé</b>' +
           '<p style="margin:6px 0 10px;color:#374151">Choisissez le tableau à mettre en forme :</p>' +
           opt.pages.map(function (pg, i) { return '<button type="button" data-ld="go" data-i="' + i + '" style="display:block;width:100%;text-align:left;font:inherit;padding:8px 10px;margin:0 0 6px;border:1px solid #D1D5DB;border-radius:4px;background:#fff;cursor:pointer">' + String(pg.name).replace(/[&<>"]/g, '') + '</button>'; }).join('') +
-          '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Ensuite, mettez le tableau en forme, puis cliquez de nouveau sur le favori "Capturer une présentation".</p>');
+          '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Ensuite, mettez le tableau en forme, puis cliquez de nouveau sur le favori "Assistant TdB RPE".</p>');
         Array.prototype.forEach.call(pb.querySelectorAll('[data-ld="go"]'), function (bt) {
           bt.onclick = function () { try { W.ddCtrl.changePage(opt.pages[+bt.getAttribute('data-i')].uid); } catch (e) { /* ignore */ } pb.remove(); };
         });
@@ -209,7 +209,115 @@ var LD_VIEW_CAPTURE = function (opt) {
         '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Vous ne voyez pas la barre de favoris ? Appuyez sur Ctrl+Maj+B. Ensuite, un clic sur ce favori, depuis n\'importe quelle page du tableau de bord, remettra le tableau dans cette présentation.</p>';
       zone.querySelector('a').onclick = function (e) { e.preventDefault(); };
     };
-  })();
+  };
+
+  /* ---- Assistant pas à pas affiché DANS le tableau de bord (favori "Assistant TdB RPE") ---- */
+  function guide() {
+    var D = document, W = window, timer = null;
+    function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function vis(e) { return !!(e && (e.offsetWidth || e.offsetHeight)); }
+    function toolbar() { return Array.prototype.filter.call(D.querySelectorAll('.editToolbar'), vis)[0] || null; }
+    if (!W.ddCtrl) { alertBox('Ouvrez d\'abord le tableau de bord RPE, puis cliquez de nouveau sur le favori "Assistant TdB RPE".'); return; }
+    function alertBox(msg) { var a = D.createElement('div'); a.style.cssText = 'position:fixed;z-index:999999;right:16px;bottom:16px;max-width:360px;background:#D92424;color:#fff;padding:12px 16px;border-radius:8px;font:13px Arial,sans-serif'; a.textContent = msg; D.body.appendChild(a); setTimeout(function () { a.remove(); }, 6000); }
+    var old = D.getElementById('ldGuide'); if (old) old.remove();
+    var g = D.createElement('div');
+    g.id = 'ldGuide';
+    g.style.cssText = 'position:fixed;z-index:999998;right:16px;top:80px;width:360px;max-width:calc(100vw - 32px);max-height:calc(100vh - 100px);overflow:auto;background:#fff;color:#0D1440;border:1px solid #E5E7EB;border-top:5px solid #FFCC52;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.28);font:13px Arial,sans-serif;line-height:1.5';
+    D.body.appendChild(g);
+    var B = 'font:inherit;font-weight:bold;border-radius:4px;padding:8px 12px;cursor:pointer;';
+    var B1 = B + 'background:#293378;color:#fff;border:1px solid #293378;', B2 = B + 'background:#fff;color:#293378;border:1px solid #293378;';
+    function frame(n, title, body) {
+      var dots = [1, 2, 3].map(function (i) { return '<span style="flex:1;height:5px;border-radius:3px;background:' + (i < n ? '#406BDE' : i === n ? '#293378' : '#E5E7EB') + '"></span>'; }).join('');
+      g.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:12px 14px 6px"><b style="flex:1;font-size:15px">Assistant TdB RPE</b>' +
+        '<button type="button" data-g="min" title="Réduire" style="border:0;background:none;font-size:18px;cursor:pointer;color:#6B7280">&minus;</button>' +
+        '<button type="button" data-g="close" title="Fermer" style="border:0;background:none;font-size:20px;cursor:pointer;color:#6B7280">&times;</button></div>' +
+        '<div style="display:flex;gap:4px;padding:0 14px">' + dots + '</div>' +
+        '<div style="padding:10px 14px 14px"><div style="font-size:12px;color:#6B7280">Étape ' + n + ' sur 3</div><b style="display:block;font-size:14px;margin:2px 0 8px">' + title + '</b>' + body + '</div>';
+      g.querySelector('[data-g="close"]').onclick = function () { clearInterval(timer); unhi(); g.remove(); };
+      g.querySelector('[data-g="min"]').onclick = function () {
+        var body0 = g.innerHTML; unhi();
+        g.style.width = 'auto'; g.style.top = 'auto'; g.style.bottom = '16px';
+        g.innerHTML = '<button type="button" style="' + B1 + '">Assistant TdB RPE : reprendre</button>';
+        g.querySelector('button').onclick = function () { g.style.width = '360px'; g.style.top = '80px'; g.style.bottom = 'auto'; show(cur); };
+      };
+    }
+    /* mise en évidence d'un élément du tableau de bord, avec une bulle explicative */
+    var hiEls = [];
+    function unhi() { hiEls.forEach(function (e) { e.remove(); }); hiEls = []; }
+    function hi(el, text) {
+      unhi();
+      if (!el) return;
+      try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* ignore */ }
+      setTimeout(function () {
+        var r = el.getBoundingClientRect();
+        var o = D.createElement('div');
+        o.style.cssText = 'position:fixed;z-index:999997;pointer-events:none;left:' + (r.left - 6) + 'px;top:' + (r.top - 6) + 'px;width:' + (r.width + 12) + 'px;height:' + (r.height + 12) + 'px;border:4px solid #FFCC52;border-radius:8px;box-shadow:0 0 0 9999px rgba(13,20,64,.35)';
+        var t = D.createElement('div');
+        var top = r.bottom + 12 + 80 > W.innerHeight ? Math.max(8, r.top - 70) : r.bottom + 12;
+        t.style.cssText = 'position:fixed;z-index:999998;max-width:280px;left:' + Math.max(8, Math.min(r.left, W.innerWidth - 300)) + 'px;top:' + top + 'px;background:#0D1440;color:#fff;padding:8px 12px;border-radius:6px;font:13px Arial,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+        t.textContent = text;
+        D.body.appendChild(o); D.body.appendChild(t); hiEls = [o, t];
+        setTimeout(unhi, 6000);
+      }, 350);
+    }
+    var cur = 1;
+    function show(n) {
+      cur = n; clearInterval(timer); unhi();
+      var tb = toolbar();
+      if (n === 1) {
+        frame(1, 'Choisissez le tableau à mettre en forme',
+          (tb ? '<p style="margin:0 0 8px;background:#E2E8FB;border-radius:4px;padding:6px 8px">Vous êtes déjà sur un tableau personnalisé. <button type="button" data-g="here" style="' + B2 + 'padding:4px 8px">Continuer avec celui-ci</button></p>' : '') +
+          (opt.pages || []).map(function (pg, i) { return '<button type="button" data-g="go" data-i="' + i + '" style="display:block;width:100%;text-align:left;font:inherit;padding:9px 10px;margin:0 0 6px;border:1px solid #D1D5DB;border-radius:6px;background:#fff;cursor:pointer">' + esc(pg.name) + '</button>'; }).join(''));
+        Array.prototype.forEach.call(g.querySelectorAll('[data-g="go"]'), function (bt) {
+          bt.onclick = function () {
+            var pg = opt.pages[+bt.getAttribute('data-i')];
+            try { W.ddCtrl.changePage(pg.uid); } catch (e) { /* ignore */ }
+            g.querySelector('div[style*="padding:10px"]').innerHTML = '<p>Ouverture du tableau <b>' + esc(pg.name) + '</b>...</p>';
+            var t0 = Date.now();
+            timer = setInterval(function () {
+              var t = toolbar(), pgEl = t && t.closest('.dashboard_page[role="main"]');
+              if (t && pgEl && (!pg.uid || pgEl.getAttribute('uid') === String(pg.uid))) { clearInterval(timer); show(2); }
+              else if (Date.now() - t0 > 30000) { clearInterval(timer); show(1); }
+            }, 500);
+          };
+        });
+        var here = g.querySelector('[data-g="here"]'); if (here) here.onclick = function () { show(2); };
+      } else if (n === 2) {
+        if (!tb) { show(1); return; }
+        var st = 'display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed #E5E7EB';
+        var num = function (k) { return '<span style="flex:none;width:20px;height:20px;border-radius:50%;background:#E3E5F1;color:#293378;font-weight:bold;font-size:11px;display:inline-flex;align-items:center;justify-content:center">' + k + '</span>'; };
+        var show2 = function (k) { return ' <button type="button" data-g="show" data-k="' + k + '" style="' + B2 + 'padding:2px 8px;font-size:12px">Me montrer</button>'; };
+        frame(2, 'Mettez le tableau en forme',
+          '<div style="' + st + '">' + num(1) + '<div><b>Lignes et colonnes</b> : dans la liste <b>Dimensions</b>, à gauche, faites glisser une dimension sur l\'en-tête du tableau.' + show2('dim') + '</div></div>' +
+          '<div style="' + st + '">' + num(2) + '<div><b>Chiffres</b> : sous <b>Mesures</b>, faites glisser la mesure voulue dans le tableau.' + show2('mes') + '</div></div>' +
+          '<div style="' + st + '">' + num(3) + '<div><b>Filtres</b> : cliquez sur l\'<b>entonnoir</b>, puis <b>Ajouter un filtre</b> (territoire, sexe, date...) et validez par <b>OK</b>.' + show2('fil') + '</div></div>' +
+          '<div style="' + st + ';border-bottom:0">' + num(4) + '<div>Le résultat s\'affiche dans le <b>tableau</b>. Vérifiez qu\'il vous convient.' + show2('tab') + '</div></div>' +
+          '<p style="margin:8px 0;background:#FFF4D6;border-radius:4px;padding:6px 8px;font-size:12px">Une erreur ? Appuyez sur F5 pour revenir au tableau d\'origine, puis relancez l\'assistant.</p>' +
+          '<div style="display:flex;gap:8px;justify-content:space-between"><button type="button" data-g="back" style="' + B2 + '">Changer de tableau</button><button type="button" data-g="next" style="' + B1 + '">Mon tableau est prêt</button></div>');
+        Array.prototype.forEach.call(g.querySelectorAll('[data-g="show"]'), function (bt) {
+          bt.onclick = function () {
+            var k = bt.getAttribute('data-k'), t = toolbar(); if (!t) return;
+            var fr = D.getElementById(t.id.replace(/_editToolbar$/, ''));
+            if (k === 'dim') hi(t.querySelector('.editToolTitle1') || t, 'Les dimensions : faites-en glisser une sur l\'en-tête du tableau.');
+            if (k === 'mes') hi(t.querySelector('.editToolTitle1[title="Mesures"]') || t, 'Les mesures : faites glisser celle que vous voulez afficher.');
+            if (k === 'fil') hi(t.querySelector('.editToolIconFilters') || t, 'Cliquez ici pour ouvrir les filtres du tableau.');
+            if (k === 'tab') hi((fr && fr.querySelector('table.table')) || fr, 'Votre tableau : son en-tête reçoit les dimensions glissées.');
+          };
+        });
+        g.querySelector('[data-g="back"]').onclick = function () { show(1); };
+        g.querySelector('[data-g="next"]').onclick = function () { show(3); };
+      } else {
+        frame(3, 'Enregistrez votre présentation',
+          '<p style="margin:0 0 10px">Une fenêtre va s\'ouvrir en bas à droite. Vous y choisirez la <b>période</b> (si le tableau contient une date), vérifierez le <b>nom</b>, puis rangerez le <b>bouton jaune</b> dans votre barre de favoris.</p>' +
+          '<div style="display:flex;gap:8px;justify-content:space-between"><button type="button" data-g="back" style="' + B2 + '">Retour</button><button type="button" data-g="cap" style="' + B1 + '">Capturer maintenant</button></div>');
+        g.querySelector('[data-g="back"]').onclick = function () { show(2); };
+        g.querySelector('[data-g="cap"]').onclick = function () { unhi(); g.remove(); run(); };
+      }
+    }
+    show(toolbar() ? 2 : 1);
+  }
+
+  if (opt.ui && opt.guide) guide(); else run();
 };
 
 var LD_VIEW_APPLY = function (V) {
@@ -303,10 +411,18 @@ var LD_VIEW_APPLY = function (V) {
     }
     function tfFromJSON(dm, j) {
       var FS = W.FilterSelection, dim = tfDim(dm, j.dim);
-      if (!FS || !dim || !Array.isArray(dim.members)) return null;
-      var mem = (j.selectedMembers || []).filter(function (m) { return dim.members.indexOf(m) >= 0; });
-      if (!mem.length) return null;
+      if (!FS || !dim) return null;
       var h = j.hierarchy == null ? -1 : j.hierarchy, l = j.level == null ? -1 : j.level, oids = null;
+      var all = j.selectedMembers || [];
+      var mem = Array.isArray(dim.members) ? all.filter(function (m) { return dim.members.indexOf(m) >= 0; }) : [];
+      /* dimensions volumineuses (territoires) : membres chargés côté serveur, absents de la liste locale.
+         On transmet alors les valeurs telles quelles, comme DigDash (recalcIds se charge du reste). */
+      if (!mem.length && all.length) {
+        var ff = new FS(dim, h, l, dim.membersOnServer ? [] : (j.origIds || []).slice(), all.slice(), undefined, j.mode || 0, j.displayValue);
+        try { ff.recalcIds(); } catch (e) { /* ignore */ }
+        return ff;
+      }
+      if (!mem.length) return null;
       if (l !== -1 && typeof W.getMemberPos === 'function') { try { oids = W.getMemberPos(dim, h, l, mem); } catch (e) { oids = null; } }
       if (l === -1 || !oids || !oids.length) { l = -1; oids = mem.map(function (m) { return dim.members.indexOf(m); }); }
       var f = new FS(dim, h, l, oids, mem.slice(), undefined, j.mode || 0, j.displayValue);
@@ -432,7 +548,7 @@ var LD_VIEWS = {
   minify: function (code) { return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n\s*/g, ' '); },
   /* favori "Capturer une présentation" : utilisable par tout utilisateur, sans console */
   captureBookmarklet: function (pages) {
-    var code = '(' + LD_VIEW_CAPTURE.toString() + ')(' + JSON.stringify({ ui: true, pages: pages || [], applySrc: LD_VIEWS.minify(LD_VIEW_APPLY.toString()) }) + ');';
+    var code = '(' + LD_VIEW_CAPTURE.toString() + ')(' + JSON.stringify({ ui: true, guide: true, pages: pages || [], applySrc: LD_VIEWS.minify(LD_VIEW_APPLY.toString()) }) + ');';
     return 'javascript:' + encodeURIComponent(LD_VIEWS.minify(code));
   },
   applyScript: function (view) {

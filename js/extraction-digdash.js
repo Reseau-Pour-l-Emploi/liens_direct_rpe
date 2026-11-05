@@ -126,7 +126,7 @@ var LD_CRAWLER = function () {
         out.push({ v: mv, l: li.getAttribute('memberformated') || txt(an) || mv, lvl: lvl, p: pv, pp: li.getAttribute('parentpath') || '', nid: li.id.slice(prefix.length) });
         return;
       }
-      var v = li.id.slice(prefix.length);
+      var v = li.id.slice(prefix.length).replace(/^combo_result_/, '');
       if (!v || v === 'All' || got[v] || /_(dropdown|checkbox)$/.test(v)) return;
       got[v] = 1;
       out.push({ v: v, l: txt(li) || v });
