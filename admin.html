@@ -538,7 +538,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var name = $('vName').value.trim();
     if (!name) { toast('Donnez un nom à la présentation'); $('vName').focus(); return; }
     data.views = data.views || [];
-    data.views.push({ id: 'v' + Date.now().toString(36), name: name, note: $('vNote').value.trim(), pageId: c.pageId, pageUid: c.pageUid, portlet: c.portlet, dimensions: c.dimensions || [], mesures: c.mesures || [], publique: false, capturedAt: c.capturedAt, vue: c.vue });
+    data.views.push({ id: 'v' + Date.now().toString(36), name: name, note: $('vNote').value.trim(), pageId: c.pageId, pageUid: c.pageUid, portlet: c.portlet, dimensions: c.dimensions || [], mesures: c.mesures || [], filtres: c.filtres || [], publique: false, capturedAt: c.capturedAt, vue: c.vue });
     $('vCapture').value = ''; $('vName').value = ''; $('vNote').value = '';
     saveDraft(); renderViews(); toast('Présentation ajoutée');
   });
