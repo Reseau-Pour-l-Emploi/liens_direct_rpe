@@ -313,10 +313,11 @@ var LD_VIEW_APPLY = function (V) {
         var src = dm.dm || {};
         Object.keys(src).forEach(function (k) {
           var v = src[k], arr = Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).map(function (x) { return v[x]; }) : []);
-          arr.forEach(function (d) { if (d && d.time && d.id && Array.isArray(d.members) && r.indexOf(d) < 0) r.push(d); });
+          arr.forEach(function (d) { if (d && d.time && d.id && d.id !== 'DATMAJ' && Array.isArray(d.members) && d.members.length > 1 && r.indexOf(d) < 0) r.push(d); });
         });
       } catch (e) { /* ignore */ }
-      return r;
+      /* dimension date principale : préfixe D_, puis le plus de mois */
+      return r.sort(function (a, b) { return ((/^D_/.test(b.id) ? 1000 : 0) + b.members.length) - ((/^D_/.test(a.id) ? 1000 : 0) + a.members.length); });
     }
     var pers = (V.periodes || []).slice(), pdims = {};
     pers.forEach(function (p) { pdims[p.dim] = 1; });
@@ -329,7 +330,15 @@ var LD_VIEW_APPLY = function (V) {
       var f0 = base ? tfFromJSON(dm, base) : null;
       if (f0 && f0.dim && Array.isArray(f0.dim.members)) { target = f0.dim; hl = { h: base.hierarchy, l: base.level }; }
       if (!target) list.forEach(function (f) { if (!target && f.dim && (f.dim.time || /^D_/.test(f.dim.id)) && Array.isArray(f.dim.members)) { target = f.dim; try { var jj = JSON.parse(JSON.stringify(f)); hl = { h: jj.hierarchy, l: jj.level }; } catch (e) { /* ignore */ } } });
-      if (!target) { var td = dmTimeDims(); if (td.length) { target = td[0]; hl = target.hierarchies && target.hierarchies.length ? { h: 0, l: 0 } : { h: -1, l: -1 }; } }
+      if (!target) {
+        var td = dmTimeDims();
+        if (td.length) {
+          target = td[0];
+          /* hiérarchie contenant le niveau Mois, sinon pas de hiérarchie */
+          hl = { h: -1, l: -1 };
+          (target.hierarchies || []).some(function (h, hi) { var li = -1; (h.levels || []).forEach(function (l, i) { if (li < 0 && /mois/i.test(l.name || l.id || '')) li = i; }); if (li >= 0) { hl = { h: hi, l: li }; return true; } return false; });
+        }
+      }
       if (!target) { ko.push(pr.dim); return; }
       var byKey = {}, last = -Infinity;
       target.members.forEach(function (t) { if (typeof t !== 'number') return; var k = mkey(t); byKey[k] = t; if (k > last) last = k; });
@@ -343,9 +352,15 @@ var LD_VIEW_APPLY = function (V) {
       else for (var k = from; k <= to; k++) if (byKey[k] !== undefined) sel.push(byKey[k]);
       if (!sel.length) { ko.push((target.name || target.id) + ' : mois absent des données'); return; }
       /* origIds : position des membres dans la dimension (indispensable à DigDash) */
-      var f2 = tfFromJSON(dm, { dim: target.id, hierarchy: hl.h, level: hl.l, origIds: sel.map(function (t) { return target.members.indexOf(t); }), selectedMembers: sel, mode: 0 });
+      var oids = sel.map(function (t) { return target.members.indexOf(t); });
+      var variants = [
+        { dim: target.id, hierarchy: hl.h, level: hl.l, origIds: oids, selectedMembers: sel, mode: 0 },
+        { dim: target.id, hierarchy: hl.h, level: hl.l, selectedMembers: sel, mode: 0 },
+        { dim: target.id, hierarchy: -1, level: -1, origIds: oids, selectedMembers: sel, mode: 0 }
+      ];
+      var f2 = null;
+      variants.some(function (v) { var f = tfFromJSON(dm, v); if (f) { f.__alts = variants; f2 = f; } return !!f; });
       if (!f2) { ko.push(target.id + ' : filtre refusé'); return; }
-      try { if (f2.recalcIds) f2.recalcIds(); } catch (e) { /* ignore */ }
       list = list.filter(function (f) { return (f.dim && f.dim.id ? f.dim.id : f.dim) !== target.id; });
       list.push(f2); have[target.id] = 1;
     });
@@ -354,7 +369,16 @@ var LD_VIEW_APPLY = function (V) {
     if (list.length) {
       try {
         dm.removeFilters();
-        list.forEach(function (f) { dm.setFilter(f.clone ? f.clone() : f); });
+        list.forEach(function (f) {
+          var done = false, err = null;
+          var cands = [f].concat((f.__alts || []).map(function (v) { return tfFromJSON(dm, v); }).filter(Boolean));
+          cands.forEach(function (c) {
+            if (done) return;
+            try { dm.setFilter(c.clone ? c.clone() : c); c.getFilterString(); done = true; }
+            catch (e) { err = e; try { dm.removeFilterByDimension(c.dim); } catch (e2) { /* ignore */ } }
+          });
+          if (!done) ko.push((f.dim && (f.dim.name || f.dim.id)) + ' : ' + (err && err.message || err));
+        });
         var ex = dm.dimensionsToExcludeForNavigation || (dm.dimensionsToExcludeForNavigation = {});
         Object.keys(tExcl).forEach(function (k) { ex[k] = tExcl[k]; });
         Object.keys(have).forEach(function (k) { ex[k] = true; });
