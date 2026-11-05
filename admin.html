@@ -128,7 +128,8 @@ input[type=text],input[type=search],select{font:inherit;font-size:13px;padding:6
     <button class="tab" data-tab="import" type="button">2. Import</button>
     <button class="tab" data-tab="pages" type="button">3. Pages et filtres</button>
     <button class="tab" data-tab="params" type="button">4. Territoire et paramètres</button>
-    <button class="tab" data-tab="export" type="button">5. Publication</button>
+    <button class="tab" data-tab="views" type="button">5. Présentations</button>
+    <button class="tab" data-tab="export" type="button">6. Publication</button>
   </nav>
 
   <!-- 1. Extraction -->
@@ -225,7 +226,34 @@ input[type=text],input[type=search],select{font:inherit;font-size:13px;padding:6
     </div>
   </section>
 
-  <!-- 5. Publication -->
+  <!-- 5. Présentations de Tableaux personnalisés -->
+  <section data-panel="views" hidden>
+    <div class="card">
+      <h2>Créer une présentation automatique</h2>
+      <ol class="steps">
+        <li>Dans le tableau de bord, ouvrez une page <b>Tableau personnalisé</b> et mettez le tableau en forme à la main : dimensions en lignes et en colonnes, mesures, filtres du panneau.</li>
+        <li>Console du navigateur (<code>F12</code>) : cliquez sur <button class="btn btn--sm" id="copyCapture" type="button">Copier le script de capture</button>, collez-le puis <code>Entrée</code>. Le résultat est copié dans votre presse-papier.</li>
+        <li>Collez-le ci-dessous, donnez un nom à la présentation, puis ajoutez-la.</li>
+      </ol>
+      <div class="form-grid" style="margin-top:12px">
+        <div class="field" style="grid-column:1/-1"><label for="vCapture">Résultat de la capture</label><textarea id="vCapture" class="script" style="height:90px" placeholder='{"source":"digdash-vue",...}'></textarea></div>
+        <div class="field"><label for="vName">Nom de la présentation</label><input type="text" id="vName" placeholder="Ex. : Primo-arrivants par niveau de formation"></div>
+        <div class="field"><label for="vNote">Description (facultatif)</label><input type="text" id="vNote" placeholder="Ce que montre le tableau"></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px"><button class="btn" id="vAdd" type="button">Ajouter la présentation</button></div>
+    </div>
+    <div class="card">
+      <h2>Présentations enregistrées</h2>
+      <div id="vList"></div>
+    </div>
+    <div class="help">
+      <b>Utilisation.</b> Chaque présentation produit un <b>script</b> (à coller dans la console du tableau de bord) et un <b>favori</b> : faites glisser le bouton "Favori" dans la barre de favoris du navigateur, puis cliquez dessus depuis n'importe quelle page du tableau de bord. Le favori ouvre la bonne page si besoin et applique la mise en forme.<br>
+      Cochez "Page publique" pour proposer le favori aux utilisateurs sur la page des liens, avec la page concernée.<br>
+      <b>Limites.</b> Le favori s'appuie sur des fonctions internes de DigDash : vérifiez vos présentations après chaque mise à jour du tableau de bord. Une présentation ne vaut que pour le tableau sur lequel elle a été capturée.
+    </div>
+  </section>
+
+  <!-- 6. Publication -->
   <section data-panel="export" hidden>
     <div class="kpis" id="kpis"></div>
     <div class="card">
@@ -260,6 +288,7 @@ input[type=text],input[type=search],select{font:inherit;font-size:13px;padding:6
 
 <script src="js/liens-core.js"></script>
 <script src="js/extraction-digdash.js"></script>
+<script src="js/vues-digdash.js"></script>
 <script src="data/liens-directs-data.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -500,13 +529,60 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  /* ---- 5. Publication ---- */
+  /* ---- 5. Présentations ---- */
+  $('copyCapture').addEventListener('click', function () { copyText(LD_VIEWS.captureScript(), 'Script de capture copié : collez-le dans la console du tableau de bord'); });
+  $('vAdd').addEventListener('click', function () {
+    var raw = $('vCapture').value.trim(), c = null;
+    try { c = JSON.parse(raw); } catch (e) { c = null; }
+    if (!c || c.source !== 'digdash-vue' || !c.vue) { toast('Collez le résultat complet du script de capture'); return; }
+    var name = $('vName').value.trim();
+    if (!name) { toast('Donnez un nom à la présentation'); $('vName').focus(); return; }
+    data.views = data.views || [];
+    data.views.push({ id: 'v' + Date.now().toString(36), name: name, note: $('vNote').value.trim(), pageId: c.pageId, pageUid: c.pageUid, portlet: c.portlet, dimensions: c.dimensions || [], mesures: c.mesures || [], publique: false, capturedAt: c.capturedAt, vue: c.vue });
+    $('vCapture').value = ''; $('vName').value = ''; $('vNote').value = '';
+    saveDraft(); renderViews(); toast('Présentation ajoutée');
+  });
+  function renderViews() {
+    var vs = data.views || [];
+    if (!vs.length) { $('vList').innerHTML = '<p class="pid">Aucune présentation pour l\'instant.</p>'; return; }
+    $('vList').innerHTML = '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th style="min-width:200px">Nom</th><th style="min-width:180px">Description</th><th>Page</th><th>Contenu</th><th>Page publique</th><th style="min-width:260px">Utiliser</th><th></th></tr></thead><tbody>' +
+      vs.map(function (v, i) {
+        var p = pageById(v.pageId);
+        return '<tr><td><input type="text" data-vi="' + i + '" data-vf="name" value="' + esc(v.name) + '"></td>' +
+          '<td><input type="text" data-vi="' + i + '" data-vf="note" value="' + esc(v.note || '') + '"></td>' +
+          '<td>' + esc(p ? (p.path.slice(1).join(' > ') + ' > ' + LD.displayTitle(p)) : v.pageId) + (p ? '' : ' <span class="badge badge--warn">page absente</span>') + '</td>' +
+          '<td class="pid">' + esc((v.dimensions || []).join(' x ')) + '<br>' + esc((v.mesures || []).join(', ')) + '</td>' +
+          '<td><input type="checkbox" data-vi="' + i + '" data-vf="publique"' + (v.publique ? ' checked' : '') + '></td>' +
+          '<td><div class="btn-row"><button class="btn btn--secondary btn--sm" type="button" data-vcopy="' + i + '">Copier le script</button>' +
+          '<a class="btn btn--sm" draggable="true" href="' + esc(LD_VIEWS.bookmarklet(v)) + '" title="Faites glisser ce bouton dans la barre de favoris">Favori : ' + esc(v.name) + '</a></div></td>' +
+          '<td><button class="btn btn--danger btn--sm" type="button" data-vdel="' + i + '">Suppr.</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  $('vList').addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t.hasAttribute('data-vi')) return;
+    var v = data.views[+t.getAttribute('data-vi')];
+    v[t.getAttribute('data-vf')] = t.type === 'checkbox' ? t.checked : t.value.trim();
+    saveDraft();
+    if (t.getAttribute('data-vf') === 'name') renderViews();
+  });
+  $('vList').addEventListener('click', function (e) {
+    var c = e.target.closest('[data-vcopy]'), d = e.target.closest('[data-vdel]'), a = e.target.closest('a[draggable]');
+    if (a) { e.preventDefault(); toast('Faites glisser ce bouton dans la barre de favoris, puis utilisez-le sur le tableau de bord'); return; }
+    if (c) copyText(LD_VIEWS.applyScript(data.views[+c.getAttribute('data-vcopy')]), 'Script copié : collez-le dans la console du tableau de bord');
+    if (d) {
+      if (d.getAttribute('data-confirm') !== '1') { d.setAttribute('data-confirm', '1'); d.textContent = 'Confirmer'; return; }
+      data.views.splice(+d.getAttribute('data-vdel'), 1); saveDraft(); renderViews();
+    }
+  });
+
+  /* ---- 6. Publication ---- */
   function renderKpis() {
     var vis = data.pages.filter(function (p) { return p.visible !== false; });
     var nbF = 0, nbP = 0;
     vis.forEach(function (p) { var k = (p.filters || []).filter(function (f) { return f.enabled !== false && !f.geo && !f.tree; }).length; nbF += k; if (k) nbP++; });
     var nbG = (data.globals || []).filter(function (g) { return g.enabled; }).length;
-    $('kpis').innerHTML = [[vis.length, 'pages affichées'], [nbP, 'pages filtrables'], [nbF, 'filtres proposés'], [nbG, 'niveaux territoriaux actifs'], [LD.fmtDate(data.extractedAt) || '-', 'dernière extraction']]
+    $('kpis').innerHTML = [[vis.length, 'pages affichées'], [nbP, 'pages filtrables'], [nbF, 'filtres proposés'], [nbG, 'niveaux territoriaux actifs'], [(data.views || []).filter(function (v) { return v.publique; }).length + ' / ' + (data.views || []).length, 'présentations publiques'], [LD.fmtDate(data.extractedAt) || '-', 'dernière extraction']]
       .map(function (k) { return '<div class="kpi"><b>' + esc(k[0]) + '</b><span>' + esc(k[1]) + '</span></div>'; }).join('');
   }
   $('dlData').addEventListener('click', function () {
@@ -525,7 +601,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  function renderAll() { refreshTdbLink(); renderPages(); renderGlobals(); renderParams(); renderKpis(); }
+  function renderAll() { refreshTdbLink(); renderPages(); renderGlobals(); renderParams(); renderViews(); renderKpis(); }
   $('year').textContent = new Date().getFullYear();
   renderAll();
   showDraft();
