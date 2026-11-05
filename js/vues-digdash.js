@@ -34,6 +34,35 @@ var LD_VIEW_CAPTURE = function (opt) {
         C.prototype[m] = function () { if (!cap[key]) cap[key] = this; return f.apply(this, arguments); };
       });
     }
+    /* filtres du tableau de bord (lien, panneau) : notés avant, remis après, car l'application d'une vue les réinitialise */
+    function fdims() { var r = []; Array.prototype.forEach.call(D.querySelectorAll('span[id^="dimName"][id$="false"]'), function (e) { var k = e.id.replace(/^dimName/, '').replace(/false$/, ''); if (r.indexOf(k) < 0) r.push(k); }); return r; }
+    function factive(f) { return f && !(Array.isArray(f) && (!f.length || (f.length === 1 && f[0] === 'All'))); }
+    function fsnap() { var r = []; fdims().forEach(function (d) { try { if (factive(W.ddCtrl.getDimensionFilter(d))) { var o = W.ddCtrl.getFilterOperandByDim(d); if (o) r.push(o); } } catch (e) { /* ignore */ } }); return r; }
+    function fplain(o) { return { dimId: o.dimId, member: o.member, h: o.h, l: o.l, memberFormated: o.memberFormated, bExcludeFilter: !!o.bExcludeFilter }; }
+    function fsig(list) { return list.map(function (o) { return o.dimId + '=' + JSON.stringify(o.member); }).sort().join('|'); }
+    function fop(p) {
+      var FO = W.FilterOperand || (W.ddCtrl && W.ddCtrl.FilterOperand);
+      return FO ? new FO(p.dimId, p.member, p.h, p.l, p.memberFormated, false, p.bExcludeFilter) : null;
+    }
+    async function frestore(list) {
+      if (!list.length) return true;
+      try { W.ddCtrl.beginSelection(); list.forEach(function (o) { W.ddCtrl.filter(o); }); W.ddCtrl.commitSelection(); } catch (e) { /* repli ci-dessous */ }
+      await sleep(1500);
+      var now = fsig(fsnap().map(fplain)), want = fsig(list.map(fplain));
+      if (now === want) return true;
+      /* repli : une valeur après l'autre */
+      try {
+        W.ddCtrl.beginSelection();
+        list.forEach(function (o) {
+          var p = fplain(o), m = [].concat(p.member), FO = W.FilterOperand || (W.ddCtrl && W.ddCtrl.FilterOperand);
+          m.forEach(function (v, i) { W.ddCtrl.filter(new FO(p.dimId, v, p.h, p.l, [].concat(p.memberFormated)[i], i > 0, p.bExcludeFilter)); });
+        });
+        W.ddCtrl.commitSelection();
+      } catch (e) { return false; }
+      await sleep(1500);
+      return fsig(fsnap().map(fplain)) === want;
+    }
+    var before = fsnap();
     wrap(W.AxisEditor, 'ed'); wrap(W.DragEditHandler, 'dh');
     try {
       var cell = frame.querySelector('td.tdvHeader') || frame.querySelector('td.tdValueMeasure') || frame.querySelector('thead td');
@@ -54,6 +83,7 @@ var LD_VIEW_CAPTURE = function (opt) {
       return null;
     }
     var ed = cap.ed || (cap.dh ? findEd(cap.dh, 0, []) : null);
+    if (fsig(fsnap().map(fplain)) !== fsig(before.map(fplain))) await frestore(before);
     if (!ed) { fail('Éditeur du tableau introuvable : la version de DigDash a peut-être changé.'); return; }
     var v = ed.getCurrentViewJSON();
     var vue = typeof v === 'string' ? JSON.parse(v) : v;
@@ -66,6 +96,7 @@ var LD_VIEW_CAPTURE = function (opt) {
       portlet: fid.replace(/^frame_/, ''),
       dimensions: titles('.editToolIconDim:not(.editToolIconDimDisabled)'),
       mesures: titles('.editToolIconMeasure:not(.editToolIconMeasureDisabled)'),
+      filtres: before.map(fplain),
       vue: vue
     };
     var s = JSON.stringify(out);
@@ -87,7 +118,7 @@ var LD_VIEW_CAPTURE = function (opt) {
     var zone = b.querySelector('[data-ld="out"]');
     b.querySelector('[data-ld="make"]').onclick = function () {
       var name = b.querySelector('[data-ld="name"]').value.trim() || 'Ma présentation';
-      var V = { name: name, pageId: out.pageId, pageUid: out.pageUid, vue: out.vue };
+      var V = { name: name, pageId: out.pageId, pageUid: out.pageUid, filtres: out.filtres, vue: out.vue };
       var href = 'javascript:' + encodeURIComponent('(' + opt.applySrc + ')(' + JSON.stringify(V) + ');');
       zone.innerHTML = '<p style="margin:0 0 6px">Faites glisser ce bouton dans votre <b>barre de favoris</b> :</p>' +
         '<a href="' + esc(href) + '" draggable="true" style="display:inline-block;background:#FFCC52;color:#0D1440;font-weight:bold;text-decoration:none;padding:7px 12px;border-radius:4px">' + esc(name) + '</a>' +
@@ -145,6 +176,35 @@ var LD_VIEW_APPLY = function (V) {
         C.prototype[m] = function () { if (!cap[key]) cap[key] = this; return f.apply(this, arguments); };
       });
     }
+    /* filtres du tableau de bord (lien, panneau) : notés avant, remis après, car l'application d'une vue les réinitialise */
+    function fdims() { var r = []; Array.prototype.forEach.call(D.querySelectorAll('span[id^="dimName"][id$="false"]'), function (e) { var k = e.id.replace(/^dimName/, '').replace(/false$/, ''); if (r.indexOf(k) < 0) r.push(k); }); return r; }
+    function factive(f) { return f && !(Array.isArray(f) && (!f.length || (f.length === 1 && f[0] === 'All'))); }
+    function fsnap() { var r = []; fdims().forEach(function (d) { try { if (factive(W.ddCtrl.getDimensionFilter(d))) { var o = W.ddCtrl.getFilterOperandByDim(d); if (o) r.push(o); } } catch (e) { /* ignore */ } }); return r; }
+    function fplain(o) { return { dimId: o.dimId, member: o.member, h: o.h, l: o.l, memberFormated: o.memberFormated, bExcludeFilter: !!o.bExcludeFilter }; }
+    function fsig(list) { return list.map(function (o) { return o.dimId + '=' + JSON.stringify(o.member); }).sort().join('|'); }
+    function fop(p) {
+      var FO = W.FilterOperand || (W.ddCtrl && W.ddCtrl.FilterOperand);
+      return FO ? new FO(p.dimId, p.member, p.h, p.l, p.memberFormated, false, p.bExcludeFilter) : null;
+    }
+    async function frestore(list) {
+      if (!list.length) return true;
+      try { W.ddCtrl.beginSelection(); list.forEach(function (o) { W.ddCtrl.filter(o); }); W.ddCtrl.commitSelection(); } catch (e) { /* repli ci-dessous */ }
+      await sleep(1500);
+      var now = fsig(fsnap().map(fplain)), want = fsig(list.map(fplain));
+      if (now === want) return true;
+      /* repli : une valeur après l'autre */
+      try {
+        W.ddCtrl.beginSelection();
+        list.forEach(function (o) {
+          var p = fplain(o), m = [].concat(p.member), FO = W.FilterOperand || (W.ddCtrl && W.ddCtrl.FilterOperand);
+          m.forEach(function (v, i) { W.ddCtrl.filter(new FO(p.dimId, v, p.h, p.l, [].concat(p.memberFormated)[i], i > 0, p.bExcludeFilter)); });
+        });
+        W.ddCtrl.commitSelection();
+      } catch (e) { return false; }
+      await sleep(1500);
+      return fsig(fsnap().map(fplain)) === want;
+    }
+    var before = fsnap();
     wrap(W.AxisEditor, 'ed'); wrap(W.DragEditHandler, 'dh');
     try {
       var cell = frame.querySelector('td.tdvHeader') || frame.querySelector('td.tdValueMeasure') || frame.querySelector('thead td');
@@ -166,8 +226,13 @@ var LD_VIEW_APPLY = function (V) {
     }
     var ed = cap.ed || (cap.dh ? findEd(cap.dh, 0, []) : null);
     if (!ed) { toast('Éditeur du tableau introuvable : la version de DigDash a peut-être changé.', false); return; }
-    try { ed.applyViewJSON(V.vue); toast('Présentation "' + V.name + '" appliquée.', true); }
-    catch (e) { toast('Échec de l\'application : ' + (e && e.message || e), false); }
+    try { ed.applyViewJSON(V.vue); } catch (e) { toast('Échec de l\'application : ' + (e && e.message || e), false); return; }
+    await sleep(1500);
+    /* filtres en place (lien, panneau) prioritaires ; filtres de la capture ajoutés pour les autres dimensions */
+    var keep = before.slice(), seenDims = before.map(function (o) { return o.dimId; });
+    (V.filtres || []).forEach(function (p) { if (seenDims.indexOf(p.dimId) < 0) { var o = fop(p); if (o) keep.push(o); } });
+    var ok = await frestore(keep);
+    toast('Présentation "' + V.name + '" appliquée' + (keep.length ? (ok ? ', filtres conservés (' + keep.length + ').' : '. Attention : certains filtres n\'ont pas pu être remis.') : '.'), ok ? true : false);
   })();
 };
 
@@ -181,7 +246,7 @@ var LD_VIEWS = {
     return 'javascript:' + encodeURIComponent(LD_VIEWS.minify(code));
   },
   applyScript: function (view) {
-    var V = { name: view.name, pageId: view.pageId, pageUid: view.pageUid, vue: view.vue };
+    var V = { name: view.name, pageId: view.pageId, pageUid: view.pageUid, filtres: view.filtres || [], vue: view.vue };
     return '(' + LD_VIEW_APPLY.toString() + ')(' + JSON.stringify(V) + ');';
   },
   bookmarklet: function (view) {
