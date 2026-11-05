@@ -21,7 +21,18 @@ var LD_VIEW_CAPTURE = function (opt) {
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     function vis(e) { return !!(e && (e.offsetWidth || e.offsetHeight)); }
     var tb = Array.prototype.filter.call(D.querySelectorAll('.editToolbar'), vis)[0];
-    if (!tb) { fail('Aucun Tableau personnalisé visible : ouvrez une page Tableau personnalisé et mettez le tableau en forme.'); return; }
+    if (!tb) {
+      if (opt.ui && opt.pages && opt.pages.length && W.ddCtrl) {
+        var pb = panel('<b style="font-size:14px">Ouvrez d\'abord un tableau personnalisé</b>' +
+          '<p style="margin:6px 0 10px;color:#374151">Choisissez le tableau à mettre en forme :</p>' +
+          opt.pages.map(function (pg, i) { return '<button type="button" data-ld="go" data-i="' + i + '" style="display:block;width:100%;text-align:left;font:inherit;padding:8px 10px;margin:0 0 6px;border:1px solid #D1D5DB;border-radius:4px;background:#fff;cursor:pointer">' + String(pg.name).replace(/[&<>"]/g, '') + '</button>'; }).join('') +
+          '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Ensuite, mettez le tableau en forme, puis cliquez de nouveau sur le favori "Capturer une présentation".</p>');
+        Array.prototype.forEach.call(pb.querySelectorAll('[data-ld="go"]'), function (bt) {
+          bt.onclick = function () { try { W.ddCtrl.changePage(opt.pages[+bt.getAttribute('data-i')].uid); } catch (e) { /* ignore */ } pb.remove(); };
+        });
+      } else fail('Aucun Tableau personnalisé visible : ouvrez une page Tableau personnalisé et mettez le tableau en forme.');
+      return;
+    }
     var fid = tb.id.replace(/_editToolbar$/, ''), frame = D.getElementById(fid), src = tb.querySelector('.editTool.drag');
     var page = tb.closest('.dashboard_page[role="main"]');
     var saved = [];
@@ -122,10 +133,11 @@ var LD_VIEW_CAPTURE = function (opt) {
     }
     function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     var btn = 'font:inherit;font-weight:bold;border-radius:4px;padding:7px 12px;cursor:pointer;';
-    var b = panel('<b style="font-size:14px">Présentation capturée</b>' +
-      '<p style="margin:6px 0;color:#374151">' + esc(resume) + '</p>' +
-      '<label style="display:block;font-size:12px;color:#374151;margin-top:8px">Nom du favori</label>' +
-      '<input data-ld="name" type="text" value="' + esc(out.dimensions.join(' x ').slice(0, 60)) + '" style="width:100%;box-sizing:border-box;font:inherit;padding:7px 8px;border:1px solid #D1D5DB;border-radius:4px;margin:4px 0 10px">' +
+    var nstep = 0;
+    function stp(t) { nstep++; return '<div style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-weight:bold"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:#293378;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px">' + nstep + '</span>' + t + '</div>'; }
+    var b = panel('<b style="font-size:15px">Créer votre favori</b>' +
+      '<p style="margin:6px 0 0;color:#374151;background:#F5F2EE;border-radius:4px;padding:6px 8px">Tableau capturé : ' + esc(resume) + '</p>' +
+      (out.tdates.length ? stp('Choisissez la période') : '') +
       out.tdates.map(function (d, i) {
         var sel = 'box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid #D1D5DB;border-radius:4px;';
         var opts = d.mois.map(function (m) { return '<option value="' + m.k + '">' + esc(m.l) + '</option>'; }).join('');
@@ -136,6 +148,9 @@ var LD_VIEW_CAPTURE = function (opt) {
           '<div data-ld="permois" style="display:none"><select data-ld="m1" style="width:100%;' + sel + '">' + opts + '</select></div>' +
           '<div data-ld="perplage" style="display:none;gap:6px"><select data-ld="pdeb" style="flex:1;' + sel + '" title="Début">' + opts + '</select><select data-ld="pfin" style="flex:1;' + sel + '" title="Fin">' + opts + '</select></div></div>';
       }).join('') +
+      stp('Vérifiez le nom du favori') +
+      '<input data-ld="name" type="text" value="' + esc(out.dimensions.join(' x ').slice(0, 60)) + '" style="width:100%;box-sizing:border-box;font:inherit;padding:7px 8px;border:1px solid #D1D5DB;border-radius:4px;margin:0 0 4px">' +
+      stp('Créez le favori') +
       '<button type="button" data-ld="make" style="' + btn + 'background:#293378;color:#fff;border:1px solid #293378">Créer le favori</button> ' +
       '<div data-ld="out" style="margin-top:10px"></div>');
     var zone = b.querySelector('[data-ld="out"]');
@@ -188,9 +203,10 @@ var LD_VIEW_CAPTURE = function (opt) {
       var name = b.querySelector('[data-ld="name"]').value.trim() || 'Ma présentation';
       var V = { name: name, pageId: out.pageId, pageUid: out.pageUid, tfiltres: out.tfiltres, periodes: periodes(), vue: out.vue };
       var href = 'javascript:' + encodeURIComponent('(' + opt.applySrc + ')(' + JSON.stringify(V) + ');');
-      zone.innerHTML = '<p style="margin:0 0 6px">Faites glisser ce bouton dans votre <b>barre de favoris</b> :</p>' +
-        '<a href="' + esc(href) + '" draggable="true" style="display:inline-block;background:#FFCC52;color:#0D1440;font-weight:bold;text-decoration:none;padding:7px 12px;border-radius:4px">' + esc(name) + '</a>' +
-        '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Un clic sur ce favori, depuis n\'importe quelle page du tableau de bord, remettra le tableau dans cette présentation. Barre de favoris masquée : Ctrl+Maj+B.</p>';
+      zone.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-weight:bold"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:#1B7F3B;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px">' + (nstep + 1) + '</span>Rangez-le dans vos favoris</div>' +
+        '<p style="margin:0 0 8px">Cliquez sur le bouton jaune, gardez le clic enfoncé et <b>faites-le glisser tout en haut de la fenêtre</b>, dans la barre de favoris, puis relâchez.</p>' +
+        '<div style="text-align:center"><a href="' + esc(href) + '" draggable="true" title="Faites-moi glisser vers la barre de favoris" style="display:inline-block;background:#FFCC52;color:#0D1440;font-weight:bold;text-decoration:none;padding:9px 14px;border-radius:4px;box-shadow:0 0 0 4px rgba(255,204,82,.35);cursor:grab">&#9733; ' + esc(name) + '</a></div>' +
+        '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Vous ne voyez pas la barre de favoris ? Appuyez sur Ctrl+Maj+B. Ensuite, un clic sur ce favori, depuis n\'importe quelle page du tableau de bord, remettra le tableau dans cette présentation.</p>';
       zone.querySelector('a').onclick = function (e) { e.preventDefault(); };
     };
   })();
@@ -415,8 +431,8 @@ var LD_VIEWS = {
   captureScript: function () { return '(' + LD_VIEW_CAPTURE.toString() + ')();'; },
   minify: function (code) { return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n\s*/g, ' '); },
   /* favori "Capturer une présentation" : utilisable par tout utilisateur, sans console */
-  captureBookmarklet: function () {
-    var code = '(' + LD_VIEW_CAPTURE.toString() + ')(' + JSON.stringify({ ui: true, applySrc: LD_VIEWS.minify(LD_VIEW_APPLY.toString()) }) + ');';
+  captureBookmarklet: function (pages) {
+    var code = '(' + LD_VIEW_CAPTURE.toString() + ')(' + JSON.stringify({ ui: true, pages: pages || [], applySrc: LD_VIEWS.minify(LD_VIEW_APPLY.toString()) }) + ');';
     return 'javascript:' + encodeURIComponent(LD_VIEWS.minify(code));
   },
   applyScript: function (view) {
