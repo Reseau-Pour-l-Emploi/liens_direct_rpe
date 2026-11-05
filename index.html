@@ -538,6 +538,8 @@ document.addEventListener('DOMContentLoaded', function () {
         '<li>Cliquez sur le bouton jaune ci-dessous, <b>gardez le clic enfoncé</b>, faites-le glisser jusque dans cette barre, puis relâchez.</li></ol>' +
         '<div class="drag-demo">' + DEMO + '</div>' +
         '<div style="text-align:center"><a class="bm-btn" draggable="true" href="' + esc(LD_VIEWS.captureBookmarklet(tpPages.map(function (t) { return { name: tpName(t), uid: t.uid }; }))) + '" title="Faites-moi glisser vers la barre de favoris">' + ICO.grid + 'Assistant TdB RPE</a></div>' +
+        '<p class="sub" style="margin-top:14px">Conseillé : faites aussi glisser ce lien, pour ouvrir le tableau de bord en un clic depuis n\'importe quel onglet.</p>' +
+        '<div style="text-align:center"><a class="btn btn--secondary" draggable="true" href="' + esc(LD_VIEWS.homeUrl('')) + '" title="Faites-moi glisser vers la barre de favoris">' + ICO.open + 'Tableau de bord RPE</a></div>' +
         '<div class="tip">Le bouton ne réagit pas au clic, c\'est normal : il faut le <b>faire glisser</b>. S\'il refuse de se déposer, votre poste bloque peut-être ce type de favori : contactez l\'équipe qui gère cette page.</div>' +
         '<label class="check"><input type="checkbox" id="wzInst"' + (inst ? ' checked' : '') + '> Le bouton "Assistant TdB RPE" est dans ma barre de favoris</label>';
     } else if (wz.step === 2) {
@@ -545,10 +547,10 @@ document.addEventListener('DOMContentLoaded', function () {
         '<ol class="do"><li>Ouvrez le tableau : <a class="btn" target="_blank" rel="noopener" id="wzGo" href="' + esc(p ? LD.buildUrl(DATA, p, {}, null) : '#') + '">' + ICO.open + 'Ouvrir le tableau personnalisé</a></li>' +
         '<li>Dans l\'onglet du tableau de bord, cliquez sur le favori <b>Assistant TdB RPE</b> de votre barre de favoris.</li>' +
         '<li>Une fenêtre d\'aide s\'ouvre <b>à droite du tableau de bord</b>. Suivez-la : elle vous montre où cliquer pour mettre le tableau en forme, puis vous aide à l\'enregistrer dans vos favoris.</li></ol>' +
-        '<div class="tip">Vous pouvez fermer cette page : toute la suite se passe dans le tableau de bord.</div>';
+        '<div class="tip">Vous pouvez fermer cette page : toute la suite se passe dans le tableau de bord. Astuce : depuis un onglet déjà ouvert (pas un nouvel onglet vide), le favori <b>Assistant TdB RPE</b> ouvre lui-même le tableau de bord ; recliquez dessus une fois la page chargée.</div>';
     } else {
       h = '<h3>Pour retrouver votre tableau</h3><p class="sub">Une fois votre présentation enregistrée :</p>' +
-        '<ol class="do"><li>Ouvrez le tableau de bord, puis cliquez sur le favori de votre présentation. La bonne page s\'ouvre et le tableau se met en forme, avec vos filtres.</li>' +
+        '<ol class="do"><li>Cliquez sur le favori de votre présentation. Si le tableau de bord n\'est pas ouvert, il s\'ouvre automatiquement : cliquez alors <b>une seconde fois</b> sur le favori une fois la page chargée. Le tableau se met en forme, avec vos filtres.</li>' +
         '<li>Un message en bas à droite confirme la mise en forme et liste les filtres appliqués.</li>' +
         '<li>Pour créer une autre présentation, cliquez simplement de nouveau sur <b>Assistant TdB RPE</b> dans le tableau de bord.</li></ol>' +
         '<p><button class="btn btn--secondary" type="button" id="wzAgain">Choisir un autre tableau</button></p>';
