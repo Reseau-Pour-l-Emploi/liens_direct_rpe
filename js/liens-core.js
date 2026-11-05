@@ -160,6 +160,7 @@ var LD = (function () {
       extractedAt: ext.extractedAt || '',
       baseUrl: cur.baseUrl || ext.url || '',
       params: cur.params || {},
+      views: cur.views || [],
       globals: globals,
       pages: pages
     };
