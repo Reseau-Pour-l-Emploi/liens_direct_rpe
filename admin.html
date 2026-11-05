@@ -553,10 +553,14 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td>' + esc(p ? (p.path.slice(1).join(' > ') + ' > ' + LD.displayTitle(p)) : v.pageId) + (p ? '' : ' <span class="badge badge--warn">page absente</span>') + '</td>' +
           '<td class="pid">' + esc((v.dimensions || []).join(' x ')) + '<br>' + esc((v.mesures || []).join(', ')) + ((v.tfiltresTexte || []).length ? '<br>Filtres : ' + esc(v.tfiltresTexte.join(', ')) : '') +
           (v.tdates || []).map(function (d) {
-            var cur = ((v.periodes || []).filter(function (x) { return x.dim === d.dim; })[0] || { mode: 'fixe' }).mode;
+            var p = (v.periodes || []).filter(function (x) { return x.dim === d.dim; })[0] || { mode: 'fixe' };
+            var cur = p.mode === 'mois' && JSON.stringify(p.keys || []) === JSON.stringify(d.keys || []) ? 'fixe' : p.mode;
+            var mo = function (k) { return (d.mois || []).map(function (m) { return '<option value="' + m.k + '"' + (m.k === k ? ' selected' : '') + '>' + esc(m.l) + '</option>'; }).join(''); };
             return '<div style="margin-top:6px">Période ' + esc(d.nom) + ' : <select data-vi="' + i + '" data-vper="' + esc(d.dim) + '">' +
-              [['fixe', 'Mois fixe (' + d.texte + ')'], ['dernier', 'Dernier mois disponible'], ['dernierN1', 'Même mois, année précédente'], ['12m', '12 derniers mois'], ['12mN1', '13e au 24e mois']]
-                .map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === cur ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></div>';
+              [['fixe', 'Période capturée (' + d.texte + ')'], ['dernier', 'Dernier mois disponible'], ['dernierN1', 'Même mois, année précédente'], ['12m', '12 derniers mois'], ['12mN1', '13e au 24e mois'], ['mois', 'Un mois au choix'], ['plage', 'Une période au choix']]
+                .map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === cur ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>' +
+              (cur === 'mois' ? ' <select data-vi="' + i + '" data-vm1="' + esc(d.dim) + '">' + mo((p.keys || [])[0]) + '</select>' : '') +
+              (cur === 'plage' ? ' du <select data-vi="' + i + '" data-vdeb="' + esc(d.dim) + '">' + mo(p.from) + '</select> au <select data-vi="' + i + '" data-vfin="' + esc(d.dim) + '">' + mo(p.to) + '</select>' : '') + '</div>';
           }).join('') + '</td>' +
           '<td><input type="checkbox" data-vi="' + i + '" data-vf="publique"' + (v.publique ? ' checked' : '') + '></td>' +
           '<td><div class="btn-row"><button class="btn btn--secondary btn--sm" type="button" data-vcopy="' + i + '">Copier le script</button>' +
@@ -568,10 +572,24 @@ document.addEventListener('DOMContentLoaded', function () {
     var t = e.target;
     if (!t.hasAttribute('data-vi')) return;
     var v = data.views[+t.getAttribute('data-vi')];
-    if (t.hasAttribute('data-vper')) {
-      var dimP = t.getAttribute('data-vper');
-      v.periodes = (v.periodes || []).filter(function (x) { return x.dim !== dimP; });
-      if (t.value !== 'fixe') v.periodes.push({ dim: dimP, mode: t.value });
+    var dimP = t.getAttribute('data-vper') || t.getAttribute('data-vm1') || t.getAttribute('data-vdeb') || t.getAttribute('data-vfin');
+    if (dimP) {
+      var dd = (v.tdates || []).filter(function (x) { return x.dim === dimP; })[0] || { mois: [], keys: [] };
+      var old = (v.periodes || []).filter(function (x) { return x.dim === dimP; })[0] || {};
+      var np = { dim: dimP, mode: old.mode || 'mois' };
+      if (t.hasAttribute('data-vper')) {
+        np.mode = t.value;
+        if (t.value === 'fixe') { np.mode = 'mois'; np.keys = dd.keys || []; }
+        if (t.value === 'mois') np.keys = [dd.mois.length ? dd.mois[0].k : 0];
+        if (t.value === 'plage') { np.to = dd.mois.length ? dd.mois[0].k : 0; np.from = dd.mois.length ? dd.mois[Math.min(11, dd.mois.length - 1)].k : 0; }
+      } else {
+        np.keys = old.keys; np.from = old.from; np.to = old.to;
+        if (t.hasAttribute('data-vm1')) np.keys = [+t.value];
+        if (t.hasAttribute('data-vdeb')) np.from = +t.value;
+        if (t.hasAttribute('data-vfin')) np.to = +t.value;
+        if (np.mode === 'plage' && np.from > np.to) { var tmp = np.from; np.from = np.to; np.to = tmp; }
+      }
+      v.periodes = (v.periodes || []).filter(function (x) { return x.dim !== dimP; }).concat([np]);
       saveDraft(); renderViews(); return;
     }
     v[t.getAttribute('data-vf')] = t.type === 'checkbox' ? t.checked : t.value.trim();
