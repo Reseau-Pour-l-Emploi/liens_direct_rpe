@@ -219,7 +219,23 @@ var LD_VIEW_CAPTURE = function (opt) {
     function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function vis(e) { return !!(e && (e.offsetWidth || e.offsetHeight)); }
     function toolbar() { return Array.prototype.filter.call(D.querySelectorAll('.editToolbar'), vis)[0] || null; }
-    if (!W.ddCtrl && opt.home) { location.href = opt.home; return; }
+    function goDD(url, name) {
+      var D = document, inDD = /digdash_dashboard/.test(location.pathname);
+      var o = D.getElementById('ldGo'); if (o) o.remove();
+      o = D.createElement('div'); o.id = 'ldGo';
+      o.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(13,20,64,.45);display:flex;align-items:center;justify-content:center;font:14px Arial,sans-serif';
+      o.innerHTML = '<div style="background:#fff;color:#0D1440;max-width:420px;width:calc(100% - 32px);border-top:5px solid #FFCC52;border-radius:10px;padding:20px;box-shadow:0 8px 28px rgba(0,0,0,.3);line-height:1.5">' +
+        '<div style="font-weight:bold;font-size:16px;margin-bottom:8px">' + (inDD ? 'Tableau de bord en cours de chargement' : 'Ouverture du tableau de bord RPE') + '</div>' +
+        (inDD ? '<p style="margin:0 0 14px">Attendez la fin du chargement, puis <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">&#9733; ' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</p>'
+          : '<p style="margin:0 0 6px">Le tableau de bord s\'ouvre dans <b data-n="1">3</b> s.</p><ol style="margin:0 0 14px;padding-left:20px"><li>Une fois la page chargée, <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">&#9733; ' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</li></ol>') +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' + (inDD ? '' : '<button data-x="1" style="font:inherit;font-weight:bold;padding:8px 12px;border-radius:4px;border:1px solid #293378;background:#fff;color:#293378;cursor:pointer">Annuler</button>') +
+        '<button data-ok="1" style="font:inherit;font-weight:bold;padding:8px 12px;border-radius:4px;border:1px solid #293378;background:#293378;color:#fff;cursor:pointer">' + (inDD ? 'Compris' : 'Ouvrir maintenant') + '</button></div></div>';
+      (D.body || D.documentElement).appendChild(o);
+      var n = 3, tm = inDD ? null : setInterval(function () { n--; var c = o.querySelector('[data-n]'); if (c) c.textContent = n; if (n <= 0) { clearInterval(tm); location.href = url; } }, 1000);
+      o.querySelector('[data-ok]').onclick = function () { clearInterval(tm); o.remove(); if (!inDD) location.href = url; };
+      var x = o.querySelector('[data-x]'); if (x) x.onclick = function () { clearInterval(tm); o.remove(); };
+    }
+    if (!W.ddCtrl && opt.home) { goDD(opt.home, 'Assistant TdB RPE'); return; }
     if (!W.ddCtrl) { alertBox('Ouvrez d\'abord le tableau de bord RPE, puis cliquez de nouveau sur le favori "Assistant TdB RPE".'); return; }
     function alertBox(msg) { var a = D.createElement('div'); a.style.cssText = 'position:fixed;z-index:999999;right:16px;bottom:16px;max-width:360px;background:#D92424;color:#fff;padding:12px 16px;border-radius:8px;font:13px Arial,sans-serif'; a.textContent = msg; D.body.appendChild(a); setTimeout(function () { a.remove(); }, 6000); }
     var old = D.getElementById('ldGuide'); if (old) old.remove();
@@ -336,7 +352,23 @@ var LD_VIEW_APPLY = function (V) {
       D.body.appendChild(t);
       if (ok !== undefined) setTimeout(function () { t.remove(); }, 4000);
     }
-    if (!W.ddCtrl && V.url) { location.href = V.url; return; }
+    function goDD(url, name) {
+      var D = document, inDD = /digdash_dashboard/.test(location.pathname);
+      var o = D.getElementById('ldGo'); if (o) o.remove();
+      o = D.createElement('div'); o.id = 'ldGo';
+      o.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(13,20,64,.45);display:flex;align-items:center;justify-content:center;font:14px Arial,sans-serif';
+      o.innerHTML = '<div style="background:#fff;color:#0D1440;max-width:420px;width:calc(100% - 32px);border-top:5px solid #FFCC52;border-radius:10px;padding:20px;box-shadow:0 8px 28px rgba(0,0,0,.3);line-height:1.5">' +
+        '<div style="font-weight:bold;font-size:16px;margin-bottom:8px">' + (inDD ? 'Tableau de bord en cours de chargement' : 'Ouverture du tableau de bord RPE') + '</div>' +
+        (inDD ? '<p style="margin:0 0 14px">Attendez la fin du chargement, puis <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">&#9733; ' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</p>'
+          : '<p style="margin:0 0 6px">Le tableau de bord s\'ouvre dans <b data-n="1">3</b> s.</p><ol style="margin:0 0 14px;padding-left:20px"><li>Une fois la page chargée, <b>cliquez de nouveau sur le favori</b> <b style="background:#FFCC52;padding:1px 6px;border-radius:3px">&#9733; ' + String(name).replace(/[&<>"]/g, '') + '</b> pour appliquer vos paramètres.</li></ol>') +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' + (inDD ? '' : '<button data-x="1" style="font:inherit;font-weight:bold;padding:8px 12px;border-radius:4px;border:1px solid #293378;background:#fff;color:#293378;cursor:pointer">Annuler</button>') +
+        '<button data-ok="1" style="font:inherit;font-weight:bold;padding:8px 12px;border-radius:4px;border:1px solid #293378;background:#293378;color:#fff;cursor:pointer">' + (inDD ? 'Compris' : 'Ouvrir maintenant') + '</button></div></div>';
+      (D.body || D.documentElement).appendChild(o);
+      var n = 3, tm = inDD ? null : setInterval(function () { n--; var c = o.querySelector('[data-n]'); if (c) c.textContent = n; if (n <= 0) { clearInterval(tm); location.href = url; } }, 1000);
+      o.querySelector('[data-ok]').onclick = function () { clearInterval(tm); o.remove(); if (!inDD) location.href = url; };
+      var x = o.querySelector('[data-x]'); if (x) x.onclick = function () { clearInterval(tm); o.remove(); };
+    }
+    if (!W.ddCtrl && V.url) { goDD(V.url, V.name); return; }
     if (!W.ddCtrl || !W.AxisEditor) { toast('Ouvrez d\'abord le tableau de bord RPE, puis relancez la présentation.', false); return; }
     function toolbar() {
       return Array.prototype.filter.call(D.querySelectorAll('.editToolbar'), function (tb) {
