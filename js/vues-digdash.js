@@ -49,15 +49,19 @@ var LD_VIEW_CAPTURE = function (opt) {
       function h(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
       function st(t) { k++; return '<div style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-weight:bold"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:#293378;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px">' + k + '</span>' + t + '</div>'; }
       var B = 'font:inherit;font-weight:bold;border-radius:4px;padding:7px 12px;cursor:pointer;';
+      var SEL = 'box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid #D1D5DB;border-radius:4px;width:100%;margin:4px 0;';
       var pg = Array.prototype.filter.call(D.querySelectorAll('.dashboard_page[role="main"][uid]'), vis)[0];
       if (!pg) { fail('Aucune page du tableau de bord n\'est affichée.'); return; }
       var pname = LV.names[pg.id] || (opt.names || {})[pg.id] || pg.id.replace(/_/g, ' ');
       var q = new URLSearchParams(location.search), home = opt.home;
       if (!home) home = location.origin + location.pathname + '?' + ['domain', 'user', 'pass'].filter(function (x) { return q.get(x); }).map(function (x) { return x + '=' + e(q.get(x)); }).join('&');
-      var url = home.replace('?', '?defaultPage=' + e(pg.id) + (/\?$/.test(home) ? '' : '&')), lst = [], warn = [];
+      var url = home.replace('?', '?defaultPage=' + e(pg.id) + (/\?$/.test(home) ? '' : '&')), lst = [], warn = [], keep = [], dates = [];
+      /* les identifiants des éléments du panneau de filtres finissent par "false" (dimensions) ou "true" (dates) */
+      function sx(d) { return D.getElementById('dimName' + d + 'false') ? 'false' : 'true'; }
+      function el(p, d) { return D.getElementById(p + d + sx(d)); }
       /* hiérarchie et niveaux lus dans le panneau de filtres ; niveau du membre lu dans l'arbre du filtre (aria-level) */
       function hierOf(d) {
-        var hs = D.getElementById('H' + d + 'false'), ls = D.getElementById('L' + d + 'false');
+        var hs = el('H', d), ls = el('L', d);
         return { h: hs && hs.options.length ? hs.options[hs.selectedIndex >= 0 ? hs.selectedIndex : 0].value : '', L: ls ? Array.prototype.map.call(ls.options, function (o) { return o.value; }).reverse() : [] };
       }
       function treeLvl(v, lab) {
@@ -83,7 +87,25 @@ var LD_VIEW_CAPTURE = function (opt) {
         if (/^CLPE/i.test(v) && L.length) return L[L.length - 1];
         return '';
       }
-      function dimName(d) { var t = D.getElementById('dim' + d + 'false'), sp = D.getElementById('dimName' + d + 'false'); return (opt.dims || {})[d] || (t && t.getAttribute('title')) || (sp && sp.textContent.trim()) || d; }
+      function dimName(d) { var t = el('dim', d), sp = el('dimName', d), n = (opt.dims || {})[d] || (t && t.getAttribute('title')) || (sp && sp.textContent.trim()) || d; return n === d && /^D_/.test(d) ? 'Date' : n; }
+      /* mois d'une valeur de date : 01/02/2024, 2024-02, "février 2024" ou horodatage */
+      var MO = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+      function mkey(x) {
+        var s = String(x == null ? '' : x).replace(/^combo_result_/, '').trim().toLowerCase(), m;
+        if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return +m[3] * 12 + (+m[2] - 1);
+        if ((m = s.match(/^(\d{4})-(\d{2})/))) return +m[1] * 12 + (+m[2] - 1);
+        if ((m = s.match(/^([a-zéû]+)\.? (\d{4})$/))) { var i = MO.indexOf(m[1]); if (i < 0) MO.forEach(function (n, j) { if (n.indexOf(m[1]) === 0) i = j; }); if (i >= 0) return +m[2] * 12 + i; }
+        if (/^\d{9,13}$/.test(s)) { var dt = new Date(s.length > 11 ? +s : +s * 1000); return dt.getFullYear() * 12 + dt.getMonth(); }
+        return null;
+      }
+      function mlab(k) { return MO[k % 12] + ' ' + Math.floor(k / 12); }
+      /* cases à cocher de la page (ex. actualisation hybride) et filtre masqué qu'elles pilotent (checkboxTypeMesure -> C_TYPEMESURE) */
+      var cks = Array.prototype.filter.call(D.querySelectorAll('.gwt-HTML input[type="checkbox"].custom-check'), vis).map(function (c) {
+        var kk = '', pe = c.parentElement;
+        (pe && typeof pe.className === 'string' ? pe.className.split(/\s+/) : []).forEach(function (n) { var m = n.match(/^checkbox(\w+?)\d*$/i); if (m) kk = m[1].toUpperCase(); });
+        return { label: pe ? pe.textContent.replace(/\s+/g, ' ').trim() : '', checked: !!c.checked, key: kk };
+      }).filter(function (c) { return c.label; });
+      function linked(d) { return cks.some(function (c) { return c.key && d.toUpperCase().indexOf(c.key) >= 0; }); }
       var act = {};
       fsnap().map(fplain).forEach(function (p) {
         act[p.dimId] = 1;
@@ -91,50 +113,90 @@ var LD_VIEW_CAPTURE = function (opt) {
         var labs = [].concat(p.memberFormated || []).map(String), dn = dimName(p.dimId);
         if (!vals.length) return;
         if (p.bExcludeFilter) { warn.push(dn); return; }
+        if (!linked(p.dimId)) keep.push(p);
         url += '&' + e(p.dimId) + '=' + e(vals.join(','));
         var T = (opt.terr || {})[p.dimId], HL = hierOf(p.dimId), L = HL.L.length ? HL.L : (T ? T.L : []), hh = p.h || HL.h || (T && T.h);
         if (hh && (T || treeLvl(vals[0], labs[0]))) { var ln = lvlName(p, T, L, vals[0], labs[0]); url += '&' + e('H' + p.dimId) + '=' + e(hh); if (ln) url += '&' + e('L' + p.dimId) + '=' + e(ln); }
-        lst.push({ d: dn, v: labs.length === vals.length ? labs.join(', ') : vals.join(', ') });
+        var shown = labs.length === vals.length ? labs.join(', ') : vals.join(', ');
+        /* filtre de date : mois disponibles lus dans le panneau de filtres */
+        if (/^D_/.test(p.dimId) && vals.length === 1) {
+          var ms = el('M', p.dimId), mois = [], seen = {};
+          if (ms) Array.prototype.forEach.call(ms.options, function (o) { var kx = mkey(o.value); if (kx !== null && !seen[kx]) { seen[kx] = 1; mois.push({ k: kx, l: mlab(kx), v: o.value }); } });
+          mois.sort(function (a, b) { return b.k - a.k; });
+          var k0 = mkey(labs[0]); if (k0 === null) k0 = mkey(vals[0]);
+          if (mois.length && k0 !== null) dates.push({ dim: p.dimId, nom: dn, texte: shown, k0: k0, mois: mois });
+        }
+        if (!linked(p.dimId)) lst.push({ d: dn, v: shown, date: /^D_/.test(p.dimId) });
       });
-      /* filtres masqués pilotés par une case à cocher de la page (ex. actualisation hybride) : sans filtre actif,
-         on transmet explicitement toutes les valeurs pour que le lien ne retombe pas sur le réglage par défaut de la page */
-      var cks = Array.prototype.filter.call(D.querySelectorAll('.gwt-HTML input[type="checkbox"].custom-check'), vis);
-      var keys = cks.map(function (c) { var k = ''; var el = c.parentElement; (el && typeof el.className === 'string' ? el.className.split(/\s+/) : []).forEach(function (n) { var m = n.match(/^checkbox(\w+?)\d*$/i); if (m) k = m[1].toUpperCase(); }); return k; }).filter(Boolean);
+      /* sans filtre actif sur le filtre piloté par une case : toutes les valeurs, pour que le lien ne retombe pas sur le réglage par défaut */
       fdims().forEach(function (d) {
-        if (act[d] || !keys.some(function (k) { return d.toUpperCase().indexOf(k) >= 0; })) return;
-        var t = D.getElementById('dim' + d + 'false'), ms = D.getElementById('M' + d + 'false');
+        if (act[d] || !linked(d)) return;
+        var t = el('dim', d), ms = el('M', d);
         if (!t || t.style.display !== 'none' || !ms) return;
         var vals = Array.prototype.map.call(ms.options, function (o) { return o.value; }).filter(function (v) { return v && v !== 'Tous' && v !== 'All'; });
         if (!vals.length || vals.length > 20) return;
         url += '&' + e(d) + '=' + e(vals.join(','));
-        lst.push({ d: dimName(d), v: 'toutes les valeurs', x: 1 });
       });
-      var cases = cks.map(function (c) {
-        var lb = c.parentElement ? c.parentElement.textContent.trim() : '';
-        return lb ? (c.checked ? '&#9745; ' : '&#9744; ') + h(lb) : '';
-      }).filter(Boolean);
+      function perOpts(d) {
+        var S = {}, n = d.mois.length, L = d.mois[0].k;
+        d.mois.forEach(function (m) { S[m.k] = 1; });
+        return [['fixe', 'Période capturée : ' + d.texte], ['dernier', 'Dernier mois disponible'], ['dernierN1', 'Même mois, année précédente'], ['mois', 'Un mois au choix']]
+          .filter(function (o) { return o[0] === 'fixe' || (o[0] === 'dernier' && n > 0) || (o[0] === 'dernierN1' && S[L - 12]) || (o[0] === 'mois' && n > 1); });
+      }
       var b = panel('<b style="font-size:15px">Créer votre favori</b>' +
         '<p style="margin:6px 0 0;color:#374151;background:#F5F2EE;border-radius:4px;padding:6px 8px">Page : <b>' + h(pname) + '</b></p>' +
         st('Vérifiez les filtres') +
-        (lst.length ? '<ul style="margin:0 0 4px;padding-left:18px">' + lst.map(function (x) { return '<li>' + h(x.d) + ' : <b>' + h(x.v) + '</b></li>'; }).join('') + '</ul>' + (cases.length ? '<p style="margin:4px 0;font-size:12px;color:#374151">Cases de la page reprises : ' + cases.join(' | ') + '</p>' : '')
+        (lst.length || cks.length ? '<ul style="margin:0 0 4px;padding-left:18px">' + lst.map(function (x) { return '<li>' + h(x.d) + ' : <b>' + h(x.v) + '</b></li>'; }).join('') +
+            cks.map(function (c) { return '<li>' + (c.checked ? '&#9745; ' : '&#9744; ') + h(c.label) + '</li>'; }).join('') + '</ul>'
           : '<p style="margin:0 0 4px;color:#374151">Aucun filtre : le favori ouvrira la page sans filtre. Pour en ajouter, fermez cette fenêtre, réglez les filtres de la page, puis relancez l\'assistant.</p>') +
-        (warn.length ? '<p style="margin:4px 0;background:#FFF4D6;border-radius:4px;padding:6px 8px;font-size:12px">Non repris dans le lien (valeurs exclues) : ' + h(warn.join(', ')) + '.</p>' : '') +
+        (warn.length ? '<p style="margin:4px 0;background:#FFF4D6;border-radius:4px;padding:6px 8px;font-size:12px">Non repris (valeurs exclues) : ' + h(warn.join(', ')) + '.</p>' : '') +
+        (dates.length ? st('Choisissez la période') + dates.map(function (d, i) {
+          return '<div data-ld="pbox" data-i="' + i + '"><label style="display:block;font-size:12px;color:#374151">' + h(d.nom) + ' : ' + d.mois.length + ' mois disponible' + (d.mois.length > 1 ? 's' : '') + '</label>' +
+            '<select data-ld="per" style="' + SEL + '">' + perOpts(d).map(function (o) { return '<option value="' + o[0] + '">' + h(o[1]) + '</option>'; }).join('') + '</select>' +
+            '<select data-ld="m1" style="' + SEL + 'display:none">' + d.mois.map(function (m) { return '<option value="' + m.k + '">' + h(m.l) + '</option>'; }).join('') + '</select></div>';
+        }).join('') : '') +
         st('Vérifiez le nom du favori') +
-        '<input data-ld="name" type="text" value="' + h((pname + (lst.length ? ' - ' + lst.filter(function (x) { return !x.x; }).map(function (x) { return x.v; }).join(' - ') : '')).slice(0, 90)) + '" style="width:100%;box-sizing:border-box;font:inherit;padding:7px 8px;border:1px solid #D1D5DB;border-radius:4px;margin:0 0 4px">' +
+        '<input data-ld="name" type="text" value="" style="width:100%;box-sizing:border-box;font:inherit;padding:7px 8px;border:1px solid #D1D5DB;border-radius:4px;margin:0 0 4px">' +
         st('Créez le favori') +
         '<button type="button" data-ld="make" style="' + B + 'background:#293378;color:#fff;border:1px solid #293378">Créer le favori</button>' +
         '<div data-ld="out" style="margin-top:10px"></div>');
+      var nameIn = b.querySelector('[data-ld="name"]'), edited = false;
+      nameIn.oninput = function () { edited = true; };
+      function pers() {
+        return Array.prototype.map.call(b.querySelectorAll('[data-ld="pbox"]'), function (bx) {
+          var d = dates[+bx.getAttribute('data-i')], m = bx.querySelector('[data-ld="per"]').value, p = { dim: d.dim, mode: m };
+          if (m === 'mois') p.key = +bx.querySelector('[data-ld="m1"]').value;
+          p.lab = m === 'fixe' ? d.texte : m === 'dernier' ? 'Dernier mois' : m === 'dernierN1' ? 'Même mois N-1' : mlab(p.key);
+          return p;
+        });
+      }
+      function defName() {
+        if (edited) return;
+        var P = pers(), pl = P.filter(function (p) { return p.mode !== 'fixe'; }).map(function (p) { return p.lab; });
+        var vs = lst.filter(function (x) { return !(x.date && pl.length); }).map(function (x) { return x.v; });
+        nameIn.value = ((pl.length ? pl.join(', ') + ' - ' : '') + pname + (vs.length ? ' - ' + vs.join(' - ') : '')).slice(0, 90);
+      }
+      Array.prototype.forEach.call(b.querySelectorAll('[data-ld="pbox"]'), function (bx) {
+        var s0 = bx.querySelector('[data-ld="per"]'), s1 = bx.querySelector('[data-ld="m1"]');
+        s0.onchange = function () { s1.style.display = s0.value === 'mois' ? 'block' : 'none'; defName(); };
+        s1.onchange = defName;
+      });
+      defName();
       b.querySelector('[data-ld="make"]').onclick = function () {
-        var name = b.querySelector('[data-ld="name"]').value.trim() || pname, z = b.querySelector('[data-ld="out"]');
+        var name = nameIn.value.trim() || pname, z = b.querySelector('[data-ld="out"]'), P = pers();
+        /* lien classique si rien à recalculer ; sinon favori qui applique la période et les cases dans le tableau de bord */
+        var simple = !cks.length && !P.some(function (p) { return p.mode !== 'fixe'; });
+        var href = simple ? url : 'javascript:' + encodeURIComponent('(' + opt.pageSrc + ')(' + JSON.stringify({ name: name, url: url, pageId: pg.id, pageUid: pg.getAttribute('uid'), filters: keep, cases: cks.map(function (c) { return { label: c.label, checked: c.checked }; }), periodes: P }) + ');');
         z.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-weight:bold"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:#1B7F3B;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px">' + (k + 1) + '</span>Rangez-le dans vos favoris</div>' +
           '<p style="margin:0 0 8px">Cliquez sur le bouton bleu, gardez le clic enfoncé et <b>faites-le glisser tout en haut de la fenêtre</b>, dans la barre de favoris, puis relâchez.</p>' +
-          '<div style="text-align:center"><a data-ld="bm" href="' + h(url) + '" draggable="true" title="Faites-moi glisser vers la barre de favoris" style="display:inline-block;background:#406BDE;color:#fff;font-weight:bold;text-decoration:none;padding:9px 14px;border-radius:4px;box-shadow:0 0 0 4px rgba(64,107,222,.3);cursor:grab">🔵 ' + h(name) + '</a></div>' +
-          '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px"><button type="button" data-ld="cp" style="' + B + 'background:#fff;color:#293378;border:1px solid #293378;padding:4px 10px">Copier le lien</button><a href="' + h(url) + '" target="_blank" rel="noopener" style="' + B + 'background:#fff;color:#293378;border:1px solid #293378;padding:4px 10px;text-decoration:none">Tester</a></div>' +
-          '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">C\'est un lien classique : <b>un seul clic</b> ouvre la page filtrée, même depuis un nouvel onglet. Il peut aussi être envoyé par mail ou Teams. Barre de favoris invisible ? Ctrl+Maj+B.</p>';
+          '<div style="text-align:center"><a data-ld="bm" href="' + h(href) + '" draggable="true" title="Faites-moi glisser vers la barre de favoris" style="display:inline-block;background:#406BDE;color:#fff;font-weight:bold;text-decoration:none;padding:9px 14px;border-radius:4px;box-shadow:0 0 0 4px rgba(64,107,222,.3);cursor:grab">🔵 ' + h(name) + '</a></div>' +
+          (simple ? '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px"><button type="button" data-ld="cp" style="' + B + 'background:#fff;color:#293378;border:1px solid #293378;padding:4px 10px">Copier le lien</button><a href="' + h(url) + '" target="_blank" rel="noopener" style="' + B + 'background:#fff;color:#293378;border:1px solid #293378;padding:4px 10px;text-decoration:none">Tester</a></div>' +
+              '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">C\'est un lien classique : <b>un seul clic</b> ouvre la page filtrée, même depuis un nouvel onglet. Il peut aussi être envoyé par mail ou Teams. Barre de favoris invisible ? Ctrl+Maj+B.</p>'
+            : '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Ce favori recalcule la période et remet les cases de la page à chaque clic. Depuis le tableau de bord, <b>un clic</b> suffit ; s\'il n\'est pas ouvert, il s\'ouvre : cliquez alors une seconde fois sur le favori. Barre de favoris invisible ? Ctrl+Maj+B.</p>');
         z.querySelector('[data-ld="bm"]').onclick = function (ev) { ev.preventDefault(); };
-        z.querySelector('[data-ld="cp"]').onclick = function () {
-          var bt = this;
-          function done(ok) { bt.textContent = ok ? 'Lien copié' : 'Copie impossible'; }
+        var cp = z.querySelector('[data-ld="cp"]');
+        if (cp) cp.onclick = function () {
+          function done(ok) { cp.textContent = ok ? 'Lien copié' : 'Copie impossible'; }
           try { navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(false); }); } catch (x) { done(false); }
         };
       };
@@ -152,7 +214,7 @@ var LD_VIEW_CAPTURE = function (opt) {
       });
     }
     /* filtres du tableau de bord (lien, panneau) : notés avant, remis après, car l'application d'une vue les réinitialise */
-    function fdims() { var r = []; Array.prototype.forEach.call(D.querySelectorAll('span[id^="dimName"][id$="false"]'), function (e) { var k = e.id.replace(/^dimName/, '').replace(/false$/, ''); if (r.indexOf(k) < 0) r.push(k); }); return r; }
+    function fdims() { var r = []; Array.prototype.forEach.call(D.querySelectorAll('span[id^="dimName"][id$="false"],span[id^="dimName"][id$="true"]'), function (e) { var k = e.id.replace(/^dimName/, '').replace(/(false|true)$/, ''); if (r.indexOf(k) < 0) r.push(k); }); return r; }
     function factive(f) { return f && !(Array.isArray(f) && (!f.length || (f.length === 1 && f[0] === 'All'))); }
     function fsnap() { var r = []; fdims().forEach(function (d) { try { if (factive(W.ddCtrl.getDimensionFilter(d))) { var o = W.ddCtrl.getFilterOperandByDim(d); if (o) r.push(o); } } catch (e) { /* ignore */ } }); return r; }
     function fplain(o) { return { dimId: o.dimId, member: o.member, h: o.h, l: o.l, memberFormated: o.memberFormated, bExcludeFilter: !!o.bExcludeFilter }; }
@@ -587,7 +649,7 @@ var LD_VIEW_APPLY = function (V) {
       });
     }
     /* filtres du tableau de bord (lien, panneau) : notés avant, remis après, car l'application d'une vue les réinitialise */
-    function fdims() { var r = []; Array.prototype.forEach.call(D.querySelectorAll('span[id^="dimName"][id$="false"]'), function (e) { var k = e.id.replace(/^dimName/, '').replace(/false$/, ''); if (r.indexOf(k) < 0) r.push(k); }); return r; }
+    function fdims() { var r = []; Array.prototype.forEach.call(D.querySelectorAll('span[id^="dimName"][id$="false"],span[id^="dimName"][id$="true"]'), function (e) { var k = e.id.replace(/^dimName/, '').replace(/(false|true)$/, ''); if (r.indexOf(k) < 0) r.push(k); }); return r; }
     function factive(f) { return f && !(Array.isArray(f) && (!f.length || (f.length === 1 && f[0] === 'All'))); }
     function fsnap() { var r = []; fdims().forEach(function (d) { try { if (factive(W.ddCtrl.getDimensionFilter(d))) { var o = W.ddCtrl.getFilterOperandByDim(d); if (o) r.push(o); } } catch (e) { /* ignore */ } }); return r; }
     function fplain(o) { return { dimId: o.dimId, member: o.member, h: o.h, l: o.l, memberFormated: o.memberFormated, bExcludeFilter: !!o.bExcludeFilter }; }
@@ -767,6 +829,126 @@ var LD_VIEW_APPLY = function (V) {
   })();
 };
 
+/* Favori de page (période recalculée et cases de la page) : remet la page, ses cases et ses filtres dans le tableau de bord */
+var LD_PAGE_APPLY = function (P) {
+  (async function () {
+    var D = document, W = window;
+    function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    function vis(e) { return !!(e && (e.offsetWidth || e.offsetHeight)); }
+    function h(x) { return String(x).replace(/[&<>"]/g, ''); }
+    function toast(msg, ok) {
+      var t = D.getElementById('ldVueToast') || D.createElement('div');
+      t.id = 'ldVueToast';
+      t.style.cssText = 'position:fixed;z-index:999999;right:16px;bottom:16px;max-width:360px;padding:12px 16px;border-radius:8px;font:13px Arial,sans-serif;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.3);background:' + (ok === false ? '#D92424' : '#0D1440');
+      t.textContent = msg;
+      (D.body || D.documentElement).appendChild(t);
+      if (ok !== undefined) setTimeout(function () { t.remove(); }, 5000);
+    }
+    var nm = '🔵 ' + P.name;
+    if (!W.ddCtrl) {
+      var inDD = /digdash_dashboard/.test(location.pathname), o = D.createElement('div');
+      o.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(13,20,64,.45);display:flex;align-items:center;justify-content:center;font:14px Arial,sans-serif';
+      o.innerHTML = '<div style="background:#fff;color:#0D1440;max-width:420px;width:calc(100% - 32px);border-top:5px solid #406BDE;border-radius:10px;padding:20px;box-shadow:0 8px 28px rgba(0,0,0,.3);line-height:1.5">' +
+        '<div style="font-weight:bold;font-size:16px;margin-bottom:8px">' + (inDD ? 'Tableau de bord en cours de chargement' : 'Ouverture du tableau de bord RPE') + '</div>' +
+        (inDD ? '' : '<p style="margin:0 0 6px">Le tableau de bord s\'ouvre dans <b data-n="1">3</b> s.</p>') +
+        '<p style="margin:0 0 14px">Une fois la page chargée, <b>cliquez de nouveau sur le favori</b> <b style="background:#406BDE;color:#fff;padding:1px 6px;border-radius:3px">' + h(nm) + '</b> pour appliquer vos paramètres.</p>' +
+        '<div style="text-align:right"><button type="button" style="font:inherit;font-weight:bold;padding:8px 12px;border-radius:4px;border:1px solid #293378;background:#293378;color:#fff;cursor:pointer">' + (inDD ? 'Compris' : 'Ouvrir maintenant') + '</button></div></div>';
+      (D.body || D.documentElement).appendChild(o);
+      var n = 3, tm = inDD ? null : setInterval(function () { n--; var c = o.querySelector('[data-n]'); if (c) c.textContent = n; if (n <= 0) { clearInterval(tm); location.href = P.url; } }, 1000);
+      o.querySelector('button').onclick = function () { clearInterval(tm); o.remove(); if (!inDD) location.href = P.url; };
+      return;
+    }
+    function modified(det) {
+      var o = D.createElement('div');
+      o.style.cssText = 'position:fixed;z-index:999999;right:16px;bottom:16px;width:380px;max-width:calc(100vw - 32px);background:#fff;color:#0D1440;border:1px solid #E5E7EB;border-top:5px solid #D92424;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.28);font:13px Arial,sans-serif;line-height:1.5;padding:14px 16px';
+      o.innerHTML = '<b style="display:block;font-size:15px;margin-bottom:6px">La page a été modifiée depuis la capture</b>' +
+        '<p style="margin:0 0 8px">Le tableau de bord a changé depuis la création du favori <b>' + h(nm) + '</b> : vos paramètres ne peuvent pas être pris en compte correctement.</p>' +
+        '<p style="margin:0 0 8px"><b>Refaites une capture</b> : cliquez sur le favori <b>🧭 Assistant TdB RPE</b>, recréez le favori, puis supprimez l\'ancien (clic droit sur le favori, puis Supprimer).</p>' +
+        '<p style="margin:0 0 10px;color:#6B7280;font-size:12px">Détail : ' + h(det.join(' | ')) + '</p>' +
+        '<div style="text-align:right"><button type="button" style="font:inherit;font-weight:bold;padding:7px 12px;border-radius:4px;border:1px solid #293378;background:#293378;color:#fff;cursor:pointer">Compris</button></div>';
+      var t = D.getElementById('ldVueToast'); if (t) t.remove();
+      D.body.appendChild(o);
+      o.querySelector('button').onclick = function () { o.remove(); };
+    }
+    var pg = D.getElementById(P.pageId);
+    if (!pg) { modified(['page introuvable dans le tableau de bord']); return; }
+    if (!vis(pg)) {
+      toast('Ouverture de la page...');
+      try { W.ddCtrl.changePage(P.pageUid); } catch (e) { /* ignore */ }
+      var t0 = Date.now();
+      while (!vis(pg) && Date.now() - t0 < 30000) await sleep(400);
+      await sleep(1500);
+    }
+    toast('Application du favori "' + P.name + '"...');
+    var chg = [], txt = [];
+    function sx(d) { return D.getElementById('dimName' + d + 'false') ? 'false' : 'true'; }
+    function has(d) { return !!(D.getElementById('dimName' + d + 'false') || D.getElementById('dimName' + d + 'true')); }
+    /* 1. cases de la page : on clique seulement si l'état diffère */
+    var cks = Array.prototype.filter.call(D.querySelectorAll('.gwt-HTML input[type="checkbox"].custom-check'), vis);
+    var clicked = false;
+    (P.cases || []).forEach(function (c) {
+      var x = cks.filter(function (k) { return k.parentElement && k.parentElement.textContent.replace(/\s+/g, ' ').trim() === c.label; })[0];
+      if (!x) { chg.push('case "' + c.label + '" absente'); return; }
+      if (x.checked !== c.checked) { x.click(); clicked = true; }
+      txt.push((c.checked ? 'avec ' : 'sans ') + c.label.replace(/^inclure /i, ''));
+    });
+    if (clicked) await sleep(2000);
+    /* 2. période recalculée sur les mois disponibles au moment du clic */
+    var MO = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+    function mkey(x) {
+      var s = String(x == null ? '' : x).replace(/^combo_result_/, '').trim().toLowerCase(), m;
+      if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return +m[3] * 12 + (+m[2] - 1);
+      if ((m = s.match(/^(\d{4})-(\d{2})/))) return +m[1] * 12 + (+m[2] - 1);
+      if ((m = s.match(/^([a-zéû]+)\.? (\d{4})$/))) { var i = MO.indexOf(m[1]); if (i < 0) MO.forEach(function (n, j) { if (n.indexOf(m[1]) === 0) i = j; }); if (i >= 0) return +m[2] * 12 + i; }
+      if (/^\d{9,13}$/.test(s)) { var dt = new Date(s.length > 11 ? +s : +s * 1000); return dt.getFullYear() * 12 + dt.getMonth(); }
+      return null;
+    }
+    var list = (P.filters || []).map(function (p) { return JSON.parse(JSON.stringify(p)); });
+    list.forEach(function (p) { if (!has(p.dimId)) chg.push('filtre ' + p.dimId + ' absent'); });
+    (P.periodes || []).forEach(function (pr) {
+      if (pr.mode === 'fixe') return;
+      var p = list.filter(function (x) { return x.dimId === pr.dim; })[0], ms = D.getElementById('M' + pr.dim + sx(pr.dim));
+      if (!p || !ms) { chg.push('date ' + pr.dim + ' absente'); return; }
+      var mois = [];
+      Array.prototype.forEach.call(ms.options, function (o) { var k = mkey(o.value); if (k !== null) mois.push({ k: k, v: o.value, l: o.text }); });
+      if (!mois.length) { chg.push('mois de ' + pr.dim + ' illisibles'); return; }
+      var last = Math.max.apply(null, mois.map(function (m) { return m.k; }));
+      var want = pr.mode === 'dernier' ? last : pr.mode === 'dernierN1' ? last - 12 : pr.key;
+      var o = mois.filter(function (m) { return m.k === want; })[0];
+      if (!o) { txt.push('période absente des données'); return; }
+      /* même forme de valeur que celle capturée (horodatage ou libellé) */
+      var m0 = [].concat(p.member)[0], s0 = String(m0).replace(/^combo_result_/, ''), v = o.v;
+      if (/^\d{9,13}$/.test(s0)) {
+        var ms0 = s0.length > 11 ? +s0 : +s0 * 1000, d0 = new Date(ms0), nd = new Date(Math.floor(want / 12), want % 12, d0.getDate(), d0.getHours(), d0.getMinutes(), d0.getSeconds());
+        var nv = s0.length > 11 ? nd.getTime() : Math.round(nd.getTime() / 1000);
+        v = typeof m0 === 'number' ? nv : (/^combo_result_/.test(String(m0)) ? 'combo_result_' : '') + nv;
+      }
+      p.member = Array.isArray(p.member) ? [v] : v;
+      p.memberFormated = Array.isArray(p.memberFormated) ? [o.l] : o.l;
+      txt.push(o.l);
+    });
+    /* 3. filtres du tableau de bord */
+    list = list.filter(function (p) { return has(p.dimId); });
+    var FO = W.FilterOperand || W.ddCtrl.FilterOperand;
+    function sig() { return list.map(function (p) { var o = null; try { o = W.ddCtrl.getFilterOperandByDim(p.dimId); } catch (e) { /* ignore */ } return p.dimId + '=' + JSON.stringify(o ? [].concat(o.member).map(String) : []); }).join('|'); }
+    var want = list.map(function (p) { return p.dimId + '=' + JSON.stringify([].concat(p.member).map(String)); }).join('|');
+    if (list.length && FO) {
+      try { W.ddCtrl.beginSelection(); list.forEach(function (p) { W.ddCtrl.filter(new FO(p.dimId, p.member, p.h, p.l, p.memberFormated, false, p.bExcludeFilter)); }); W.ddCtrl.commitSelection(); } catch (e) { /* repli */ }
+      await sleep(1500);
+      if (sig() !== want) {
+        try {
+          W.ddCtrl.beginSelection();
+          list.forEach(function (p) { var m = [].concat(p.member), f = [].concat(p.memberFormated || []); m.forEach(function (v, i) { W.ddCtrl.filter(new FO(p.dimId, v, p.h, p.l, f[i], i > 0, p.bExcludeFilter)); }); });
+          W.ddCtrl.commitSelection();
+        } catch (e) { chg.push('filtres refusés'); }
+        await sleep(1500);
+      }
+    }
+    if (chg.length) { modified(chg); return; }
+    toast('Favori "' + P.name + '" appliqué' + (txt.length ? ' : ' + txt.join(' | ') : '') + '.', true);
+  })();
+};
+
 /* Construction des scripts à partir d'une présentation enregistrée */
 var LD_VIEWS = {
   captureScript: function () { return '(' + LD_VIEW_CAPTURE.toString() + ')();'; },
@@ -799,7 +981,7 @@ var LD_VIEWS = {
   },
   captureBookmarklet: function (pages, home) {
     var a = LD_VIEWS.assistData();
-    var code = '(' + LD_VIEW_CAPTURE.toString() + ')(' + JSON.stringify({ ui: true, guide: true, home: home || LD_VIEWS.homeUrl(''), terr: a.terr, pages: pages || [], applySrc: LD_VIEWS.minify(LD_VIEW_APPLY.toString()) }) + ');';
+    var code = '(' + LD_VIEW_CAPTURE.toString() + ')(' + JSON.stringify({ ui: true, guide: true, home: home || LD_VIEWS.homeUrl(''), terr: a.terr, pages: pages || [], pageSrc: LD_VIEWS.minify(LD_PAGE_APPLY.toString()), applySrc: LD_VIEWS.minify(LD_VIEW_APPLY.toString()) }) + ');';
     return 'javascript:' + encodeURIComponent(LD_VIEWS.minify(code));
   },
   applyScript: function (view) {
