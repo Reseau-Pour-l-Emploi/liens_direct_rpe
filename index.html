@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function openWizard() {
     wz.last = document.activeElement;
-    wz.step = lsGetW('ld-capture-installed') === '1' ? 1 : 0;
+    wz.step = 0;
     var bg = document.createElement('div');
     bg.className = 'wz-bg'; bg.id = 'wzBg';
     bg.innerHTML = '<div class="wz" id="wzDlg" role="dialog" aria-modal="true" aria-labelledby="wzTitle">' +
