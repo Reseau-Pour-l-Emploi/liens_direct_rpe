@@ -22,6 +22,32 @@ var LD_VIEW_CAPTURE = function (opt) {
     return { names: names, tables: tables };
   }
   var LV = live();
+  /* fenêtres de l'assistant : déplaçables par leur barre de titre, réductibles en un bouton */
+  function mover(box, bar) {
+    bar.style.cursor = 'move';
+    bar.title = 'Cliquez et faites glisser pour déplacer la fenêtre';
+    bar.onmousedown = function (ev) {
+      if (ev.button !== 0 || ev.target.closest('button,a,input,select')) return;
+      var r = box.getBoundingClientRect(), dx = ev.clientX - r.left, dy = ev.clientY - r.top;
+      box.style.left = r.left + 'px'; box.style.top = r.top + 'px'; box.style.right = 'auto'; box.style.bottom = 'auto';
+      function mv(e) { box.style.left = Math.max(0, Math.min(window.innerWidth - 80, e.clientX - dx)) + 'px'; box.style.top = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - dy)) + 'px'; }
+      function up() { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); }
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+      ev.preventDefault();
+    };
+  }
+  function reduce(box, onHide) {
+    if (onHide) onHide();
+    box.style.display = 'none';
+    var p = document.createElement('button');
+    p.type = 'button'; p.id = 'ldPill';
+    p.style.cssText = 'position:fixed;z-index:999999;right:16px;bottom:16px;font:bold 13px Arial,sans-serif;padding:10px 14px;border-radius:20px;border:0;background:#FFCC52;color:#0D1440;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer';
+    p.textContent = '🧭 Assistant TdB RPE : reprendre';
+    p.title = 'Rouvrir la fenêtre de l\'assistant';
+    var old = document.getElementById('ldPill'); if (old) old.remove();
+    document.body.appendChild(p);
+    p.onclick = function () { p.remove(); box.style.display = ''; };
+  }
   var run = async function (mode) {
     var D = document, W = window, cap = { ed: null, dh: null };
     /* message : console (admin) ou panneau à l'écran (favori utilisateur) */
@@ -29,9 +55,15 @@ var LD_VIEW_CAPTURE = function (opt) {
       var b = D.getElementById('ldVuePanel') || D.createElement('div');
       b.id = 'ldVuePanel';
       b.style.cssText = 'position:fixed;z-index:999999;right:16px;bottom:16px;width:380px;max-width:calc(100vw - 32px);background:#fff;color:#0D1440;border:1px solid #E5E7EB;border-top:4px solid #293378;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font:13px Arial,sans-serif;padding:14px 16px;line-height:1.45';
-      b.innerHTML = html + '<button type="button" data-ld="close" style="position:absolute;top:6px;right:8px;border:0;background:none;font-size:18px;cursor:pointer;color:#6B7280" title="Fermer">&times;</button>';
+      b.style.display = '';
+      b.style.maxHeight = 'calc(100vh - 32px)'; b.style.overflow = 'auto';
+      b.innerHTML = '<div data-ld="bar" style="display:flex;align-items:center;gap:6px;margin:-14px -16px 8px;padding:6px 8px 6px 16px;background:#F5F2EE;border-radius:8px 8px 0 0;font-size:12px;color:#6B7280;user-select:none"><span style="flex:1">&#10021; Déplacer la fenêtre</span>' +
+        '<button type="button" data-ld="min" title="Réduire le temps de construire votre tableau" style="border:0;background:none;font-size:18px;cursor:pointer;color:#6B7280">&minus;</button>' +
+        '<button type="button" data-ld="close" style="border:0;background:none;font-size:18px;cursor:pointer;color:#6B7280" title="Fermer">&times;</button></div>' + html;
       D.body.appendChild(b);
-      b.querySelector('[data-ld="close"]').onclick = function () { b.remove(); };
+      mover(b, b.querySelector('[data-ld="bar"]'));
+      b.querySelector('[data-ld="min"]').onclick = function () { reduce(b); };
+      b.querySelector('[data-ld="close"]').onclick = function () { var pl = D.getElementById('ldPill'); if (pl) pl.remove(); b.remove(); };
       return b;
     }
     function fail(msg) { if (opt.ui) panel('<b>Capture impossible</b><p style="margin:6px 0 0">' + msg + '</p>'); else console.log(msg); }
@@ -420,18 +452,14 @@ var LD_VIEW_CAPTURE = function (opt) {
     var B1 = B + 'background:#293378;color:#fff;border:1px solid #293378;', B2 = B + 'background:#fff;color:#293378;border:1px solid #293378;';
     function frame(n, title, body) {
       var dots = [1, 2, 3].map(function (i) { return '<span style="flex:1;height:5px;border-radius:3px;background:' + (i < n ? '#406BDE' : i === n ? '#293378' : '#E5E7EB') + '"></span>'; }).join('');
-      g.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:12px 14px 6px"><b style="flex:1;font-size:15px">Assistant TdB RPE</b>' +
-        '<button type="button" data-g="min" title="Réduire" style="border:0;background:none;font-size:18px;cursor:pointer;color:#6B7280">&minus;</button>' +
+      g.innerHTML = '<div data-g="bar" style="display:flex;align-items:center;gap:8px;padding:12px 14px 6px;user-select:none"><b style="flex:1;font-size:15px">Assistant TdB RPE <span style="font-weight:normal;font-size:11px;color:#6B7280">&#10021; déplaçable</span></b>' +
+        '<button type="button" data-g="min" title="Réduire le temps de construire votre tableau" style=""border:0;background:none;font-size:18px;cursor:pointer;color:#6B7280">&minus;</button>' +
         '<button type="button" data-g="close" title="Fermer" style="border:0;background:none;font-size:20px;cursor:pointer;color:#6B7280">&times;</button></div>' +
         '<div style="display:flex;gap:4px;padding:0 14px">' + dots + '</div>' +
         '<div style="padding:10px 14px 14px"><div style="font-size:12px;color:#6B7280">Étape ' + n + ' sur 3</div><b style="display:block;font-size:14px;margin:2px 0 8px">' + title + '</b>' + body + '</div>';
-      g.querySelector('[data-g="close"]').onclick = function () { clearInterval(timer); unhi(); g.remove(); };
-      g.querySelector('[data-g="min"]').onclick = function () {
-        var body0 = g.innerHTML; unhi();
-        g.style.width = 'auto'; g.style.top = 'auto'; g.style.bottom = '16px';
-        g.innerHTML = '<button type="button" style="' + B1 + '">Assistant TdB RPE : reprendre</button>';
-        g.querySelector('button').onclick = function () { g.style.width = '360px'; g.style.top = '80px'; g.style.bottom = 'auto'; show(cur); };
-      };
+      mover(g, g.querySelector('[data-g="bar"]'));
+      g.querySelector('[data-g="close"]').onclick = function () { clearInterval(timer); unhi(); var pl = D.getElementById('ldPill'); if (pl) pl.remove(); g.remove(); };
+      g.querySelector('[data-g="min"]').onclick = function () { reduce(g, unhi); };
     }
     /* mise en évidence d'un élément du tableau de bord, avec une bulle explicative */
     var hiEls = [];
@@ -494,6 +522,7 @@ var LD_VIEW_CAPTURE = function (opt) {
         var num = function (k) { return '<span style="flex:none;width:20px;height:20px;border-radius:50%;background:#E3E5F1;color:#293378;font-weight:bold;font-size:11px;display:inline-flex;align-items:center;justify-content:center">' + k + '</span>'; };
         var show2 = function (k) { return ' <button type="button" data-g="show" data-k="' + k + '" style="' + B2 + 'padding:2px 8px;font-size:12px">Me montrer</button>'; };
         frame(2, 'Mettez le tableau en forme',
+          '<p style="margin:0 0 6px;background:#FFF4D6;border-radius:4px;padding:6px 8px;font-size:12px">La fenêtre gêne ? Déplacez-la par sa barre de titre, ou réduisez-la avec <b>&minus;</b> le temps de construire votre tableau : un bouton <b>🧭 Assistant TdB RPE : reprendre</b> la rouvrira.</p>' +
           '<div style="' + st + '">' + num(1) + '<div><b>Lignes et colonnes</b> : dans la liste <b>Dimensions</b>, à gauche, faites glisser une dimension sur l\'en-tête du tableau.' + show2('dim') + '</div></div>' +
           '<div style="' + st + '">' + num(2) + '<div><b>Chiffres</b> : sous <b>Mesures</b>, faites glisser la mesure voulue dans le tableau.' + show2('mes') + '</div></div>' +
           '<div style="' + st + '">' + num(3) + '<div><b>Filtres</b> : cliquez sur l\'<b>entonnoir</b>, puis <b>Ajouter un filtre</b> (territoire, sexe, date...) et validez par <b>OK</b>.' + show2('fil') + '</div></div>' +
