@@ -137,6 +137,13 @@ var LD_VIEW_CAPTURE = function (opt) {
         (pe && typeof pe.className === 'string' ? pe.className.split(/\s+/) : []).forEach(function (n) { var m = n.match(/^checkbox(\w+?)\d*$/i); if (m) kk = m[1].toUpperCase(); });
         return { label: pe ? pe.textContent.replace(/\s+/g, ' ').trim() : '', checked: !!c.checked, key: kk };
       }).filter(function (c) { return c.label; });
+      /* sélecteurs de vue de la page (variables DigDash : Accès / Présence, Cumul / Mensuel...) */
+      var vars = Array.prototype.filter.call(pg.querySelectorAll('.variable-content'), vis).map(function (v) {
+        var tds = Array.prototype.filter.call(v.querySelectorAll('td[id^="' + v.id + '_"]'), function (t) { return t.textContent.trim(); }), sl = v.querySelector('select');
+        if (tds.length > 1) { var c = 0; tds.forEach(function (t, i) { if (/tdMemberSelected/.test(t.className)) c = i; }); return { id: v.id, kind: 'td', opts: tds.map(function (t) { return t.textContent.replace(/\s+/g, ' ').trim(); }), cur: c }; }
+        if (sl && sl.options.length > 1) return { id: v.id, kind: 'sel', opts: Array.prototype.map.call(sl.options, function (o) { return o.text.trim(); }), cur: Math.max(0, sl.selectedIndex) };
+        return null;
+      }).filter(Boolean);
       function linked(d) { return cks.some(function (c) { return c.key && d.toUpperCase().indexOf(c.key) >= 0; }); }
       var act = {};
       fsnap().map(fplain).forEach(function (p) {
@@ -182,6 +189,9 @@ var LD_VIEW_CAPTURE = function (opt) {
             cks.map(function (c) { return '<li>' + (c.checked ? '&#9745; ' : '&#9744; ') + h(c.label) + '</li>'; }).join('') + '</ul>'
           : '<p style="margin:0 0 4px;color:#374151">Aucun filtre : le favori ouvrira la page sans filtre. Pour en ajouter, fermez cette fenêtre, réglez les filtres de la page, puis relancez l\'assistant.</p>') +
         (warn.length ? '<p style="margin:4px 0;background:#FFF4D6;border-radius:4px;padding:6px 8px;font-size:12px">Non repris (valeurs exclues) : ' + h(warn.join(', ')) + '.</p>' : '') +
+        (vars.length ? st('Choisissez la vue') + vars.map(function (v, i) {
+          return '<label style="display:block;font-size:12px;color:#374151">' + h(v.opts.join(' / ')) + '</label><select data-ld="var" data-i="' + i + '" style="' + SEL + '">' + v.opts.map(function (o, j) { return '<option value="' + j + '"' + (j === v.cur ? ' selected' : '') + '>' + h(o) + '</option>'; }).join('') + '</select>';
+        }).join('') : '') +
         (dates.length ? st('Choisissez la période') + dates.map(function (d, i) {
           return '<div data-ld="pbox" data-i="' + i + '"><label style="display:block;font-size:12px;color:#374151">' + h(d.nom) + ' : ' + d.mois.length + ' mois disponible' + (d.mois.length > 1 ? 's' : '') + '</label>' +
             '<select data-ld="per" style="' + SEL + '">' + perOpts(d).map(function (o) { return '<option value="' + o[0] + '">' + h(o[1]) + '</option>'; }).join('') + '</select>' +
@@ -202,29 +212,31 @@ var LD_VIEW_CAPTURE = function (opt) {
           return p;
         });
       }
+      function vsel() { return Array.prototype.map.call(b.querySelectorAll('[data-ld="var"]'), function (x) { var v = vars[+x.getAttribute('data-i')]; return { id: v.id, kind: v.kind, val: v.opts[+x.value] }; }); }
       function defName() {
         if (edited) return;
-        var P = pers(), pl = P.filter(function (p) { return p.mode !== 'fixe'; }).map(function (p) { return p.lab; });
+        var P = pers(), V0 = vsel().map(function (v) { return v.val; }), pl = P.filter(function (p) { return p.mode !== 'fixe'; }).map(function (p) { return p.lab; });
         var vs = lst.filter(function (x) { return !(x.date && pl.length); }).map(function (x) { return x.v; });
-        nameIn.value = ((pl.length ? pl.join(', ') + ' - ' : '') + pname + (vs.length ? ' - ' + vs.join(' - ') : '')).slice(0, 90);
+        nameIn.value = ((pl.length ? pl.join(', ') + ' - ' : '') + pname + (V0.length ? ' - ' + V0.join(' - ') : '') + (vs.length ? ' - ' + vs.join(' - ') : '')).slice(0, 90);
       }
       Array.prototype.forEach.call(b.querySelectorAll('[data-ld="pbox"]'), function (bx) {
         var s0 = bx.querySelector('[data-ld="per"]'), s1 = bx.querySelector('[data-ld="m1"]');
         s0.onchange = function () { s1.style.display = s0.value === 'mois' ? 'block' : 'none'; defName(); };
         s1.onchange = defName;
       });
+      Array.prototype.forEach.call(b.querySelectorAll('[data-ld="var"]'), function (x) { x.onchange = defName; });
       defName();
       b.querySelector('[data-ld="make"]').onclick = function () {
         var name = nameIn.value.trim() || pname, z = b.querySelector('[data-ld="out"]'), P = pers();
         /* lien classique si rien à recalculer ; sinon favori qui applique la période et les cases dans le tableau de bord */
-        var simple = !cks.length && !P.some(function (p) { return p.mode !== 'fixe'; });
-        var href = simple ? url : 'javascript:' + encodeURIComponent('(' + opt.pageSrc + ')(' + JSON.stringify({ name: name, url: url, pageId: pg.id, pageUid: pg.getAttribute('uid'), filters: keep, cases: cks.map(function (c) { return { label: c.label, checked: c.checked }; }), periodes: P }) + ');');
+        var VS = vsel(), simple = !cks.length && !VS.length && !P.some(function (p) { return p.mode !== 'fixe'; });
+        var href = simple ? url : 'javascript:' + encodeURIComponent('(' + opt.pageSrc + ')(' + JSON.stringify({ name: name, url: url, pageId: pg.id, pageUid: pg.getAttribute('uid'), filters: keep, cases: cks.map(function (c) { return { label: c.label, checked: c.checked }; }), vars: VS, periodes: P }) + ');');
         z.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-weight:bold"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:#1B7F3B;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px">' + (k + 1) + '</span>Rangez-le dans vos favoris</div>' +
           '<p style="margin:0 0 8px">Cliquez sur le bouton bleu, gardez le clic enfoncé et <b>faites-le glisser tout en haut de la fenêtre</b>, dans la barre de favoris, puis relâchez.</p>' +
           '<div style="text-align:center"><a data-ld="bm" href="' + h(href) + '" draggable="true" title="Faites-moi glisser vers la barre de favoris" style="display:inline-block;background:#406BDE;color:#fff;font-weight:bold;text-decoration:none;padding:9px 14px;border-radius:4px;box-shadow:0 0 0 4px rgba(64,107,222,.3);cursor:grab">🔵 ' + h(name) + '</a></div>' +
           (simple ? '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px"><button type="button" data-ld="cp" style="' + B + 'background:#fff;color:#293378;border:1px solid #293378;padding:4px 10px">Copier le lien</button><a href="' + h(url) + '" target="_blank" rel="noopener" style="' + B + 'background:#fff;color:#293378;border:1px solid #293378;padding:4px 10px;text-decoration:none">Tester</a></div>' +
               '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">C\'est un lien classique : <b>un seul clic</b> ouvre la page filtrée, même depuis un nouvel onglet. Il peut aussi être envoyé par mail ou Teams. Barre de favoris invisible ? Ctrl+Maj+B.</p>'
-            : '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Ce favori recalcule la période et remet les cases de la page à chaque clic. Depuis le tableau de bord, <b>un clic</b> suffit ; s\'il n\'est pas ouvert, il s\'ouvre : cliquez alors une seconde fois sur le favori. Barre de favoris invisible ? Ctrl+Maj+B.</p>');
+            : '<p style="margin:8px 0 0;color:#6B7280;font-size:12px">Ce favori remet la vue, les cases et la période de la page à chaque clic. Depuis le tableau de bord, <b>un clic</b> suffit ; s\'il n\'est pas ouvert, il s\'ouvre : cliquez alors une seconde fois sur le favori. Barre de favoris invisible ? Ctrl+Maj+B.</p>');
         z.querySelector('[data-ld="bm"]').onclick = function (ev) { ev.preventDefault(); };
         var cp = z.querySelector('[data-ld="cp"]');
         if (cp) cp.onclick = function () {
@@ -912,6 +924,24 @@ var LD_PAGE_APPLY = function (P) {
     var chg = [], txt = [];
     function sx(d) { return D.getElementById('dimName' + d + 'false') ? 'false' : 'true'; }
     function has(d) { return !!(D.getElementById('dimName' + d + 'false') || D.getElementById('dimName' + d + 'true')); }
+    function click(x) { ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(function (n) { x.dispatchEvent(new MouseEvent(n, { bubbles: true, cancelable: true, view: W })); }); }
+    /* 0. vue de la page (variables DigDash) */
+    var vchg = false;
+    (P.vars || []).forEach(function (vr) {
+      var v = D.getElementById(vr.id);
+      if (!v) { chg.push('sélecteur de vue "' + vr.val + '" absent'); return; }
+      if (vr.kind === 'sel') {
+        var sl = v.querySelector('select'), ix = sl ? Array.prototype.map.call(sl.options, function (o) { return o.text.trim(); }).indexOf(vr.val) : -1;
+        if (ix < 0) { chg.push('vue "' + vr.val + '" absente'); return; }
+        if (sl.selectedIndex !== ix) { sl.selectedIndex = ix; sl.dispatchEvent(new Event('change', { bubbles: true })); vchg = true; }
+      } else {
+        var td = Array.prototype.filter.call(v.querySelectorAll('td[id^="' + vr.id + '_"]'), function (t) { return t.textContent.replace(/\s+/g, ' ').trim() === vr.val; })[0];
+        if (!td) { chg.push('vue "' + vr.val + '" absente'); return; }
+        if (!/tdMemberSelected/.test(td.className)) { click(td); vchg = true; }
+      }
+      txt.push(vr.val);
+    });
+    if (vchg) await sleep(1500);
     /* 1. cases de la page : on clique seulement si l'état diffère */
     var cks = Array.prototype.filter.call(D.querySelectorAll('.gwt-HTML input[type="checkbox"].custom-check'), vis);
     var clicked = false;
